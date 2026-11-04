@@ -55,6 +55,10 @@ A **running, durable FHIR test server** that connectathon participants call. It 
 | F9 | **Patient-facing part: CMS-0057.** The payer's Patient Access API lets the patient view prior authorizations, using the PDex Prior Authorization profile (`ExplanationOfBenefit`, `use = preauthorization`). **Patient authentication: minimal SMART standalone launch** (a small built-in screen where a tester picks a synthetic patient; authorization code + PKCE; patient-scoped tokens). | How a PAS `ClaimResponse` becomes that EOB is not spelled out in the profile page I read. See O9. |
 | F10 | **The IG loader identifies profiles by canonical `url` + `version`** (conditional update), never by the package's resource `id`. | Origin: 13 StructureDefinitions share an `id` across packages with different URLs; loading by `id` silently overwrote them. Verified on the Microsoft server; **re-verify on HAPI**. |
 | F11 | **Narrative handling: find the exact trigger, then retry without the narrative only on that error and keep the original in the findings log.** | Decided against the Microsoft server's narrative sanitizer. **Carried over**: it applies only if HAPI shows the same behavior. Re-test first. |
+| F12 | **The 360X Direct receiver is configurable to take inbound referrals by all three delivery methods: API, webhook and mailbox.** | Owner, 2026-11-04. "All three" is the assistant's reading: the three methods listed in the earlier question. The Kno2 test-domain details remain open (O2). |
+| F13 | **ODE referral: validate, but accept. Return the validation feedback.** | Owner, 2026-11-04. Report-first: the submission is stored and the response carries the validation results (for example an `OperationOutcome`). Rejection is not the default. This puts IG loading and conformance reporting in scope for the event, which makes O6 and F11 live. |
+| F14 | **UC07 synthetic data is authored by the assistant into `lp-digitalhealth/ohia-test-data`, branch `november_testing`** (lowercase; it exists and matches `main` at `35df2c0`). | Owner, 2026-11-04. Follows that repo's `2026-CMS-Connectathon/CLAUDE.md` (tiers, Bundle conventions, validation, doc sync). Nothing authored yet; what to author first is O13. |
+| F15 | **ARex is used for all attachment and imaging exchange in this connectathon.** Other imaging capabilities (WADO-RS / DICOMweb, SMART Imaging Access) are deferred and added later. | Owner, 2026-11-04. What "all" covers is O14. It departs from the standing WADO-RS model in the test-data repo's `CLAUDE.md` section 8 (O15). |
 
 ## 5. Superseded decisions (history; do not rebuild)
 
@@ -73,17 +77,20 @@ A **running, durable FHIR test server** that connectathon participants call. It 
 | # | Question | Why it matters / what is needed |
 |---|---|---|
 | O1 | **Facade language** (Java in-process with HAPI, .NET, TypeScript, Python). | Chosen earlier for the Microsoft stack, which is no longer the store. Options to be presented once HAPI is running. |
-| O2 | **How the HISP delivers inbound 360X referrals** (API, webhook or mailbox). | Needs Kno2's answers: will they host a Direct address for us and how do they deliver; do they have a test domain and trust bundle; do they send standard XDM. Blocks the 360X receiver. |
-| O3 | **ODE referral: validate and report back, or just accept and store?** | Decides whether IG loading and conformance reporting are in scope for the event. |
-| O4 | **UC07 test data.** `ohia-test-data` has no UC07 fixtures. May the DentaQuest rules, the DTR questionnaire and sample bundles be authored in a separate folder for owner review? | Blocks the payer simulator's data. UC04a fixtures exist. |
-| O5 | **Imaging (WADO-RS)** for UC07: in or out? | Affects whether a DICOMweb stub is needed. |
-| O6 | **Draft IG revisions** that reuse one canonical URL. | The Microsoft server could not resolve two versions of one canonical. HAPI is untested. Matters only if validation is in scope (O3). |
+| O2 | **Kno2 test details.** (Delivery method is now configurable, F12.) Will Kno2 host a Direct address for us; do they have a test domain and trust bundle; do they send standard XDM. | Owner takes these to Kno2. Blocks testing the 360X receiver, not its design. |
+| O3 | RESOLVED: see F13. | |
+| O4 | RESOLVED: see F14. What to author first is O13. | |
+| O5 | RESOLVED: see F15. | |
+| O6 | **Draft IG revisions** that reuse one canonical URL. | The Microsoft server could not resolve two versions of one canonical. HAPI is untested. **Now live:** validation is in scope (F13). |
 | O7 | **PCC-56 conflict.** The ODE adapter treats it as accept/decline; the IHE 360X supplement (Rev 1.2) defines it as Referral Decline only, with accept inside PCC-55. | Resolve with the adapter's owners before building outbound accept. |
 | O8 | **CDT licence.** The test data permits CDT use for OHIA connectathon testing only. | Confirm a shared member-accessible server stays within the ADA permission. |
 | O9 | **Subscriptions.** UC04a notifies the patient app ("referral sent", "appointment confirmed"). Does the server deliver, or do participants poll? And how is the PA EOB derived from the PAS result (stored vs. derived on read)? | Untested on HAPI. |
 | O10 | **ARex.** The spec (v0.2.0, draft and provisional) has not been read. Per the UC07 document the payer pulls the manifest content and verifies digests, so the server also acts as a client. | Read the spec before designing. |
 | O11 | **Push access for this repository.** The Claude GitHub App is not installed here, so the assistant cannot push. | An organization admin must install it (https://github.com/apps/claude/installations/select_target). |
 | O12 | **Epic onboarding.** An Epic-using member must add our Direct address as a trading partner. | Needs a partner, a test patient, a HISP and test certificates. |
+| O13 | **What UC07 data to author first, and in what order.** | The test-data repo's rules require reading the UC07 companion guide and interaction narratives (`uc07-i1` to `i5`) first, and forbid batch-generating clinically meaningful interactions from naming patterns. Those were not read in full. |
+| O14 | **Scope of "ARex for all" (F15).** Does it include UC04a's patient-submitted intraoral photos (modeled today as inline US Core `DocumentReference`)? Is the server only an ARex Content Consumer (UC07 payer), or also a Content Server? | ARex v0.2.0 defines a Content Server and a Content Consumer role. The artifacts page does not say how a PAS `Claim` references a manifest (UNVERIFIED). |
+| O15 | **Reconcile the test-data repo's `CLAUDE.md` section 8** (standing model: ImagingStudy + WADO-RS, "do not re-derive") with F15 (ARex for this event). | That file says to update it when a settled modeling decision changes. Who edits it, and how the UC07 narrative's WADO-RS steps are treated, is the owner's call. |
 
 ---
 
@@ -119,10 +126,10 @@ The test data reuses logical IDs across scenarios (for example the same patient 
 | H | **HAPI spike.** Run HAPI + PostgreSQL; rerun the profile-loading and validation checks (US Core 6.1.0; Da Vinci IGs; non-conformant resource stored; narrative with a self-closed `<span/>`; two versions of one canonical); Subscription delivery; `private_key_jwt`; SUSHI build of the ODE FSH. | Pass/fail with request and response |
 | M1 | Oracle VM (ARM), TLS, three role base paths, backend auth + minimal SMART standalone launch, loader keyed by canonical (F10), UC04a fixtures seeded | Public-URL `curl`; token flows |
 | M2 | **UC04a end to end** | Scripted run against the live URL |
-| M3 | **UC07 payer:** CRD, DTR, PAS, provider-to-payer `Communication` | Scripted run (needs O4) |
+| M3 | **UC07 payer:** CRD, DTR, PAS, provider-to-payer `Communication` | Scripted run (needs the UC07 data, O13) |
 | M4 | **CMS-0057 Patient Access:** PA EOB, patient-scoped read | A patient token sees only its own PA |
-| M5 | UC07 ARex pull, imaging reference, 360X receiver (needs O2, O5, O10) | Per-feature tests |
-| M6 | ODE referral conformance reporting (only if O3 says so), hardening, onboarding guide | Fresh-deploy test |
+| M5 | UC07 ARex pull, imaging reference, 360X receiver (needs O2, O10, O14) | Per-feature tests |
+| M6 | ODE referral validate-but-accept with feedback (F13; in scope), hardening, onboarding guide | Fresh-deploy test |
 
 ---
 
@@ -178,7 +185,7 @@ The test data reuses logical IDs across scenarios (for example the same patient 
 1. **Fix push access** (O11) so this plan and later work can reach `November_Testing`.
 2. **HAPI spike** (milestone H), reporting each check as pass or fail with the actual request and response.
 3. **Present the facade-language options** (O1) and the narrative/IG-revision findings from HAPI.
-4. **Owner takes the Kno2 questions** (O2) and answers O3, O4 and O5.
+4. **Owner takes the Kno2 questions** (O2) and answers O13, O14 and O15.
 5. Re-cut the milestone table into a final one and update this file.
 
 ## 13. Earlier artifacts
