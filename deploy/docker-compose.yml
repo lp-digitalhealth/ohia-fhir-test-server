@@ -1,0 +1,58 @@
+# OHIA FHIR Test Server: generic stack (HAPI FHIR JPA + PostgreSQL + Caddy TLS proxy).
+# This is the plain FHIR endpoint only. No auth, no validation feedback, no payer logic yet.
+# Settings come from .env (copy .env.example). Never commit .env.
+services:
+  hapi-db:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hapi
+      POSTGRES_USER: hapi
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hapi -d hapi"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  hapi:
+    image: ${HAPI_IMAGE:-hapiproject/hapi:latest}
+    restart: unless-stopped
+    depends_on:
+      hapi-db:
+        condition: service_healthy
+    environment:
+      # PostgreSQL store (per the HAPI starter README: driver, dialect, search off).
+      SPRING_DATASOURCE_URL: jdbc:postgresql://hapi-db:5432/hapi
+      SPRING_DATASOURCE_USERNAME: hapi
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATASOURCE_DRIVERCLASSNAME: org.postgresql.Driver
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
+      SPRING_JPA_PROPERTIES_HIBERNATE_SEARCH_ENABLED: "false"
+      # R4, REST-hook subscriptions on, and the public base URL so response links are correct.
+      HAPI_FHIR_FHIR_VERSION: R4
+      HAPI_FHIR_SUBSCRIPTION_RESTHOOK_ENABLED: "true"
+      HAPI_FHIR_SERVER_ADDRESS: ${PUBLIC_BASE_URL:-http://localhost:8080}/fhir
+    # No published ports: reachable only through Caddy.
+
+  caddy:
+    image: ${CADDY_IMAGE:-caddy:2-alpine}
+    restart: unless-stopped
+    depends_on:
+      - hapi
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

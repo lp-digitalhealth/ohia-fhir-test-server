@@ -1,0 +1,10 @@
+# SITE_ADDRESS is a hostname (Caddy gets a Let's Encrypt certificate automatically)
+# or ":80" for plain HTTP (local testing only).
+{$SITE_ADDRESS} {
+	encode gzip
+	# HAPI serves FHIR under /fhir. Large bundles are expected.
+	request_body {
+		max_size 100MB
+	}
+	reverse_proxy hapi:8080
+}
