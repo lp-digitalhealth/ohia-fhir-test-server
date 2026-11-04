@@ -1,6 +1,6 @@
 # Deploy: plain FHIR endpoint (HAPI + PostgreSQL + Caddy)
 
-This is the **generic stack only**: a FHIR R4 server behind HTTPS. It has no authentication, no validation feedback and no payer logic yet. Do not put real patient data in it.
+This is the **generic stack only**: a FHIR R4 server behind HTTPS. Access is protected by one **interim shared bearer token** (section 7). There is no OAuth, no validation feedback and no payer logic yet. Do not put real patient data in it.
 
 **Tested:** brought up in a cloud sandbox (x86) with Docker Compose; `/fhir/metadata` returned 200 through Caddy (HAPI FHIR Server 8.12.0, FHIR 4.0.1). **Not tested:** ARM (Oracle Ampere), real HTTPS certificates, load.
 
@@ -32,7 +32,7 @@ cd ohia-fhir-test-server/deploy
 cp .env.example .env
 ```
 
-Edit `.env`: set a long random `POSTGRES_PASSWORD`; set `SITE_ADDRESS` to your hostname; set `PUBLIC_BASE_URL` to `https://<your-hostname>`. Then:
+Edit `.env`: set a long random `POSTGRES_PASSWORD`; set `API_TOKEN` (generate one with `openssl rand -hex 32`); set `SITE_ADDRESS` to your hostname; set `PUBLIC_BASE_URL` to `https://<your-hostname>`. `docker compose` refuses to start if `POSTGRES_PASSWORD` or `API_TOKEN` is missing. Then:
 
 ```bash
 docker compose up -d
@@ -43,9 +43,11 @@ docker compose ps
 
 ```bash
 curl -s https://<your-hostname>/fhir/metadata | head -c 300
+curl -s -o /dev/null -w '%{http_code}\n' https://<your-hostname>/fhir/Patient                         # expect 401
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer <API_TOKEN>" https://<your-hostname>/fhir/Patient   # expect 200
 ```
 
-First start takes about two minutes. A JSON CapabilityStatement with `"fhirVersion": "4.0.1"` means it works.
+First start takes about two minutes. A JSON CapabilityStatement with `"fhirVersion": "4.0.1"` means it works. `/fhir/metadata` is open on purpose; everything else needs the token (401 without it).
 
 ## 5. If it does not answer
 
@@ -60,3 +62,14 @@ docker compose logs -f hapi    # follow logs
 docker compose down             # stop (data stays in volumes)
 docker compose pull && docker compose up -d   # update
 ```
+
+## 7. Access token (interim)
+
+**Revisit in January 2027.** This is a stopgap until the real OAuth design (SMART backend services and standalone launch, plan milestone M1) is built. See `docs/OHIA_FHIR_Test_server_PLAN.md`, F30.
+
+- **What it does:** `Caddyfile` rejects with `401` any request that lacks `Authorization: Bearer <API_TOKEN>`. Two things stay open: `GET`/`HEAD /fhir/metadata` (discovery) and `OPTIONS` (browser CORS preflight). The HAPI home page at `/` needs the token too.
+- **Where the token lives:** `deploy/.env` on the VM only (`API_TOKEN=...`). Never commit it, never paste it into chat or an issue.
+- **Adding it to a server that is already running:** edit `.env`, then `git pull` and `docker compose up -d`. Only the `caddy` container restarts; HAPI and the database keep their data.
+- **Rotating it:** put a new value in `.env`, run `docker compose up -d`, and give the new token to your testers. The old token stops working at once.
+- **Limits:** everyone shares one secret; there are no scopes, no per-user audit and no expiry. A leak gives full read and write access. The match is **case-sensitive**: the header must say `Bearer` exactly, and tokens must match exactly.
+- **Tested** (against a stand-in upstream, not real HAPI): 401 without a token, with a wrong, shortened or extended token, and for writes; 200 with the right token; metadata and `OPTIONS` open; path tricks such as `metadata/../Patient` rejected; Compose refuses to start without `API_TOKEN`. **Not tested:** the live stack with real HAPI behind it, browser CORS behavior, and per-request timing.

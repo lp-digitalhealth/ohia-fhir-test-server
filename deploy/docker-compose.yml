@@ -1,5 +1,6 @@
 # OHIA FHIR Test Server: generic stack (HAPI FHIR JPA + PostgreSQL + Caddy TLS proxy).
-# This is the plain FHIR endpoint only. No auth, no validation feedback, no payer logic yet.
+# This is the plain FHIR endpoint plus an interim shared bearer token (see Caddyfile).
+# No OAuth, no validation feedback, no payer logic yet.
 # Settings come from .env (copy .env.example). Never commit .env.
 services:
   hapi-db:
@@ -44,6 +45,9 @@ services:
       - hapi
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+      # Interim shared bearer token enforced in the Caddyfile. Compose refuses to start
+      # without it, so the server cannot come up open by accident.
+      API_TOKEN: ${API_TOKEN:?set API_TOKEN in .env (openssl rand -hex 32)}
     ports:
       - "${HTTP_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"
