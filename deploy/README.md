@@ -65,7 +65,7 @@ docker compose pull && docker compose up -d   # update
 
 ## 7. Access token (interim)
 
-**Revisit in January 2027.** This is a stopgap until the real OAuth design (SMART backend services and standalone launch, plan milestone M1) is built. See `docs/OHIA_FHIR_Test_server_PLAN.md`, F30.
+**Revisit in January 2027.** This is a stopgap until the real OAuth design (SMART backend services and standalone launch, plan milestone M1) is built. See `docs/OHIA_FHIR_Test_server_PLAN.md`, S1.
 
 - **What it does:** `Caddyfile` rejects with `401` any request that lacks `Authorization: Bearer <API_TOKEN>`. Two things stay open: `GET`/`HEAD /fhir/metadata` (discovery) and `OPTIONS` (browser CORS preflight). The HAPI home page at `/` needs the token too.
 - **Where the token lives:** `deploy/.env` on the VM only (`API_TOKEN=...`). Never commit it, never paste it into chat or an issue.

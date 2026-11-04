@@ -1,7 +1,7 @@
 # SITE_ADDRESS is a hostname (Caddy gets a Let's Encrypt certificate automatically)
 # or ":80" for plain HTTP (local testing only).
 #
-# INTERIM AUTH (revisit in January 2027; see docs/OHIA_FHIR_Test_server_PLAN.md F30):
+# INTERIM AUTH (revisit in January 2027; see docs/OHIA_FHIR_Test_server_PLAN.md S1):
 # one shared secret. Every request except /fhir/metadata and CORS preflights (OPTIONS)
 # must carry "Authorization: Bearer <API_TOKEN>". API_TOKEN comes from .env and is never
 # committed. docker-compose.yml refuses to start without it, so a missing token cannot

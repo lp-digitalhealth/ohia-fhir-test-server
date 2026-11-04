@@ -10,7 +10,7 @@ This document is for coding assistants to put the current state of the repo
 - The hostname and IP are deliberately not recorded here (public repo).
 - A custom domain is **on hold** (owner, 2026-11-04). Nothing depends on it.
 
-## Authentication (decision F30, open item O22)
+## Authentication (decision S1, open item S2)
 - **In this branch:** interim shared bearer token enforced by `deploy/Caddyfile`; `API_TOKEN` is passed by `deploy/docker-compose.yml`, documented in `deploy/.env.example` and `deploy/README.md` section 7.
 - **VERIFIED (stand-in upstream, not real HAPI):** 401 without or with a wrong token; 200 with the right one; `GET`/`HEAD /fhir/metadata` and `OPTIONS` open; writes to `/fhir/metadata` need the token; Compose refuses to start without `API_TOKEN`.
 - **UNVERIFIED:** the live VM with real HAPI behind the rule, browser CORS behavior, and whether the change has been rolled out to the VM. **Roll-out is a manual step** (add `API_TOKEN` to the VM's `.env`, `git pull`, `docker compose up -d`). Until then the live server is still open.
