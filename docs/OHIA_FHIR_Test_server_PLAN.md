@@ -68,6 +68,7 @@ A **running, durable FHIR test server** that connectathon participants call. It 
 | F22 | **UC07 test data build order: I1, then I2, then I4. I3 and I5 are deferred.** | Owner, 2026-11-04. Authored in `ohia-test-data`, branch `november_testing`. |
 | F23 | **The assistant may author the UC07 payer rule for D3320, D2950 and D2740** (prior authorization required, with its documentation requirement) as DentaQuest policy, patterned on the existing D7210 rule. | Owner, 2026-11-04: the three CDT codes are real and confirmed by the ADA, and the PA requirement is part of DentaQuest policy. The resources should say the rule is synthetic test data. |
 | F24 | **Radiographs (UC07 I1 and I4) are an ARex manifest of image entries plus an `ImagingStudy` pointer.** WADO-RS is deferred. | Owner, 2026-11-04. ARex v0.2.0 does not define how an `ImagingStudy` references a manifest (profiling guides decide) and says it is not for live imaging retrieval. The link convention is O20. |
+| F25 | **An `ImagingStudy` pointer references its ARex manifest by business identifier: `ImagingStudy.identifier` carries the manifest's transaction-context identifier, and the consumer finds the manifest through ARex's `arex-manifest-transaction-identifier` search parameter.** | Owner, 2026-11-04 (option B of O20). This is a local convention built on ARex's discovery mechanism; ARex itself defines no `ImagingStudy` link. |
 
 ## 5. Superseded decisions (history; do not rebuild)
 
@@ -104,7 +105,7 @@ A **running, durable FHIR test server** that connectathon participants call. It 
 | O17 | RESOLVED: one endpoint (owner, 2026-11-04); see F17. | |
 | O18 | RESOLVED: Option B chosen and drafted in the UC04a and UC07 companion guides (section 8) on `november_testing`; see F18 to F20. | |
 | O19 | RESOLVED: the UC07 test data does not exist and must be built (owner, 2026-11-04); see F20. Searched every remote branch and all FHIR resources: no UC07 patient, guardian, receiving dentist, PA number, ARex object or D3320/D2950 code. | |
-| O20 | **How an `ImagingStudy` pointer references the ARex manifest.** ARex defines a search by manifest transaction identifier and a transaction-context extension but no `ImagingStudy` link. Candidates: (A) `ImagingStudy.endpoint` to an `Endpoint` whose address is the manifest URL; (B) `ImagingStudy.identifier` carries the manifest's transaction-context business identifier, and the consumer finds the manifest through ARex's own search parameter; (C) a different local convention. | Owner decides; blocks authoring the UC07 I1 and I4 imaging resources. |
+| O20 | RESOLVED: see F25. | |
 
 ---
 
