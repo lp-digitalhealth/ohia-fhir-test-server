@@ -42,6 +42,8 @@ A **running, durable FHIR test server** that connectathon participants call. It 
 
 ## 4. Finalized decisions
 
+S-series rows (S1, S2, ...) record server setup, hosting and authentication decisions. They are numbered apart from the F and O series so that parallel work on the plan does not collide on numbers. S-rows use the same labels (FINAL, OPEN).
+
 | # | Decision | Notes |
 |---|---|---|
 | F1 | **Running endpoints**, not a spec exercise. Consumers hit real URLs. | Owner, 2026-11-04. |
@@ -73,6 +75,7 @@ A **running, durable FHIR test server** that connectathon participants call. It 
 | F27 | **CDT stays the only coding on the PAS `Claim` service lines (UC07 I2), although PAS requires `item.productOrService` to come from a value set with no CDT codes.** The 3 validator errors are left in the data on purpose and are **feedback for the PAS authors**. | Owner, 2026-11-04. Source: `profile-claim-base`, `Claim.item.productOrService`, required binding `X12278RequestedServiceType` (CPT, HCPCS, ICD-10, NDC, X12 only). The existing UC02a PAS Claims have the same defect (not edited). |
 | F28 | **UC07 I2 includes a separate documentation-requirement `Task` (`task-dtr`)**, closed when the prior authorization is decided, in addition to the single referral coordination Task. | Owner, 2026-11-04. The UC07 narrative lists a DTR Task; this reverses the earlier proposal to omit it. It is not a second coordination Task for the referral. |
 | F29 | **UC04a I1 intraoral photos travel by ARex reference, as a manifest of two image entries, not inline.** The same change moved the story to tooth #9 (D3310 root canal + D2330 lingual composite), added "no dental home" and an allergy list to the referral, and kept the crown as still needed. | Owner, 2026-11-04: rewrote Section I of the UC04 narrative (commit 73e682d on `main`) and chose scope "everything downstream", two photo entries, crown still needed. The referral's `AllergyIntolerance` is **not authored**: the narrative names no allergy and the owner will supply it. Who places the crown (she has no dental home) is an assumption in the data, flagged for the owner. |
+| S1 | **Interim authentication: one shared bearer token enforced by Caddy.** Every request needs `Authorization: Bearer <API_TOKEN>`, except `GET`/`HEAD /fhir/metadata` (discovery) and `OPTIONS` (CORS preflight). The HAPI home page needs the token too. The token lives only in the VM's `.env`, never in git. **Revisit in January 2027** and replace it with the real design (F9, M1). | Owner, 2026-11-04. See S2. Tested only against a stand-in upstream, not real HAPI (`deploy/README.md` section 7). The match is case-sensitive (`Bearer`). One shared secret: no scopes, no expiry, no per-user audit. S-series: server setup, hosting and authentication decisions are numbered apart from the F and O series, so parallel work does not collide on numbers. |
 | F30 | **UC07 I4 reuses the referral id as the post-op ARex manifest's business identifier, and pulls a minimal treatment `Encounter` and the three `Procedure`s forward from the deferred I3.** | Owner, 2026-11-04. Consequence of the first: an ARex `transaction-identifier` search for the referral id returns two manifests (I1 radiographs and I4 post-op), told apart by title, date and requesting organization. Consequence of the second: the I4 data set has no consult `Encounter` or `Consent`, so "guardian consent obtained" is summary text only. |
 
 ## 5. Superseded decisions (history; do not rebuild)
@@ -112,6 +115,7 @@ A **running, durable FHIR test server** that connectathon participants call. It 
 | O19 | RESOLVED: the UC07 test data does not exist and must be built (owner, 2026-11-04); see F20. Searched every remote branch and all FHIR resources: no UC07 patient, guardian, receiving dentist, PA number, ARex object or D3320/D2950 code. | |
 | O20 | RESOLVED: see F25. | |
 | O21 | RESOLVED: see F26 (how the PAS `Claim` references the ARex manifest). | |
+| S2 | **January 2027 revisit of authentication.** Replace the interim shared token (S1) with the real design: SMART backend services (`private_key_jwt`) and the minimal SMART standalone launch (F9, M1). | Needs O1 (facade language) decided first. Also decide: per-tester tokens, token expiry and scopes, and whether the HAPI home page stays closed. The owner asked for this to be recorded on 2026-11-04. It is not scheduled work yet. |
 
 ---
 
