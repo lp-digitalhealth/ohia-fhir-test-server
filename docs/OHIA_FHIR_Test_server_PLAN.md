@@ -69,6 +69,9 @@ A **running, durable FHIR test server** that connectathon participants call. It 
 | F23 | **The assistant may author the UC07 payer rule for D3320, D2950 and D2740** (prior authorization required, with its documentation requirement) as DentaQuest policy, patterned on the existing D7210 rule. | Owner, 2026-11-04: the three CDT codes are real and confirmed by the ADA, and the PA requirement is part of DentaQuest policy. The resources should say the rule is synthetic test data. |
 | F24 | **Radiographs (UC07 I1 and I4) are an ARex manifest of image entries plus an `ImagingStudy` pointer.** WADO-RS is deferred. | Owner, 2026-11-04. ARex v0.2.0 does not define how an `ImagingStudy` references a manifest (profiling guides decide) and says it is not for live imaging retrieval. The link convention is O20. |
 | F25 | **An `ImagingStudy` pointer references its ARex manifest by business identifier: `ImagingStudy.identifier` carries the manifest's transaction-context identifier, and the consumer finds the manifest through ARex's `arex-manifest-transaction-identifier` search parameter.** | Owner, 2026-11-04 (option B of O20). This is a local convention built on ARex's discovery mechanism; ARex itself defines no `ImagingStudy` link. |
+| F26 | **The PAS `Claim` (UC07 I2) points at its ARex manifest two ways: `Claim.identifier` repeats the manifest's transaction-context business identifier, and `Claim.supportingInfo` references the manifest `List` directly under a local category (`urn:ohia:claim-supporting-info-category\|arex-manifest`).** | Owner, 2026-11-04. The owner first chose "both" (O21). Reading PAS 2.2.1 `profile-claim` showed that its `AdditionalInformation` slice does not allow a `List` as `value[x]`; the owner then chose option A (a local category outside that slice; slicing is open). The HL7 validator reports an information message and a warning, **no error**. A local convention: neither ARex nor PAS defines it. |
+| F27 | **CDT stays the only coding on the PAS `Claim` service lines (UC07 I2), although PAS requires `item.productOrService` to come from a value set with no CDT codes.** The 3 validator errors are left in the data on purpose and are **feedback for the PAS authors**. | Owner, 2026-11-04. Source: `profile-claim-base`, `Claim.item.productOrService`, required binding `X12278RequestedServiceType` (CPT, HCPCS, ICD-10, NDC, X12 only). The existing UC02a PAS Claims have the same defect (not edited). |
+| F28 | **UC07 I2 includes a separate documentation-requirement `Task` (`task-dtr`)**, closed when the prior authorization is decided, in addition to the single referral coordination Task. | Owner, 2026-11-04. The UC07 narrative lists a DTR Task; this reverses the earlier proposal to omit it. It is not a second coordination Task for the referral. |
 
 ## 5. Superseded decisions (history; do not rebuild)
 
@@ -106,6 +109,7 @@ A **running, durable FHIR test server** that connectathon participants call. It 
 | O18 | RESOLVED: Option B chosen and drafted in the UC04a and UC07 companion guides (section 8) on `november_testing`; see F18 to F20. | |
 | O19 | RESOLVED: the UC07 test data does not exist and must be built (owner, 2026-11-04); see F20. Searched every remote branch and all FHIR resources: no UC07 patient, guardian, receiving dentist, PA number, ARex object or D3320/D2950 code. | |
 | O20 | RESOLVED: see F25. | |
+| O21 | RESOLVED: see F26 (how the PAS `Claim` references the ARex manifest). | |
 
 ---
 
