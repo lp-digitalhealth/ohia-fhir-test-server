@@ -1,10 +1,41 @@
 # SITE_ADDRESS is a hostname (Caddy gets a Let's Encrypt certificate automatically)
 # or ":80" for plain HTTP (local testing only).
+#
+# INTERIM AUTH (revisit in January 2027; see docs/OHIA_FHIR_Test_server_PLAN.md S1):
+# one shared secret. Every request except /fhir/metadata and CORS preflights (OPTIONS)
+# must carry "Authorization: Bearer <API_TOKEN>". API_TOKEN comes from .env and is never
+# committed. docker-compose.yml refuses to start without it, so a missing token cannot
+# silently leave the server open.
 {$SITE_ADDRESS} {
 	encode gzip
 	# HAPI serves FHIR under /fhir. Large bundles are expected.
 	request_body {
 		max_size 100MB
 	}
-	reverse_proxy hapi:8080
+
+	# Open on purpose: discovery (CapabilityStatement) and browser CORS preflights,
+	# which never carry an Authorization header.
+	# Reads only: matcher types in one block are ANDed, so a write to this path needs the token.
+	@meta {
+		path /fhir/metadata
+		method GET HEAD
+	}
+	@preflight method OPTIONS
+	# Everything else must present the shared token.
+	@authed header Authorization "Bearer {$API_TOKEN}"
+
+	# handle blocks are mutually exclusive and are tried in this order.
+	handle @meta {
+		reverse_proxy hapi:8080
+	}
+	handle @preflight {
+		reverse_proxy hapi:8080
+	}
+	handle @authed {
+		reverse_proxy hapi:8080
+	}
+	handle {
+		header WWW-Authenticate Bearer
+		respond "Unauthorized: send Authorization: Bearer <token>" 401
+	}
 }
