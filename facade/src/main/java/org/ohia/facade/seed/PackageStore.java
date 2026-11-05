@@ -9,10 +9,14 @@ import java.nio.file.StandardCopyOption;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import org.ohia.facade.common.UseCase;
 import org.ohia.facade.config.FacadeProperties;
 import org.springframework.stereotype.Component;
 
-/** The facade's own files: the package index and the original ARex payload bytes. */
+/**
+ * The facade's own files: one package index per use case, and the original ARex payload bytes. Payloads are
+ * kept in one folder keyed by entry id; the two use cases' entry ids differ (radiograph-*, photo-*).
+ */
 @Component
 public class PackageStore {
 
@@ -26,8 +30,8 @@ public class PackageStore {
         this.mapper = mapper;
     }
 
-    private Path indexFile() {
-        return root.resolve("package").resolve("uc07-i1.json");
+    private Path indexFile(UseCase useCase) {
+        return root.resolve("package").resolve(useCase.id() + "-i1.json");
     }
 
     private Path payloadFile(String entryId) {
@@ -39,20 +43,28 @@ public class PackageStore {
 
     /** Writes the payloads first and the index last, each through a temp file and an atomic move. */
     public void save(PackageIndex index, Map<String, byte[]> payloadsByEntryId) {
+        save(UseCase.UC07, index, payloadsByEntryId);
+    }
+
+    public void save(UseCase useCase, PackageIndex index, Map<String, byte[]> payloadsByEntryId) {
         try {
             Files.createDirectories(root.resolve("package"));
             Files.createDirectories(root.resolve("arex-payloads"));
             for (Map.Entry<String, byte[]> p : payloadsByEntryId.entrySet()) {
                 writeAtomic(payloadFile(p.getKey()), p.getValue());
             }
-            writeAtomic(indexFile(), mapper.writeValueAsBytes(index));
+            writeAtomic(indexFile(useCase), mapper.writeValueAsBytes(index));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
     public Optional<PackageIndex> load() {
-        Path f = indexFile();
+        return load(UseCase.UC07);
+    }
+
+    public Optional<PackageIndex> load(UseCase useCase) {
+        Path f = indexFile(useCase);
         if (!Files.isRegularFile(f)) {
             return Optional.empty();
         }

@@ -19,7 +19,14 @@ This document is for coding assistants to put the current state of the repo
 - **Operations:** the token lives only in the VM's `deploy/.env` (never in git) and with the owner. To roll out or rotate it, edit `API_TOKEN` in `.env` and run `docker compose up -d` (see `deploy/README.md` section 7).
 - **Revisit in January 2027:** replace the shared token with the real design (SMART backend services and standalone launch, F9 and M1). O1 is resolved (S3), so the facade exists and could take this over.
 
-## UC04a receiver and viewer (S6, S7; `facade/`, uncommitted until pushed)
+## Send UC04a, receive UC07, three-tab page (S8 to S10; `facade/`)
+- **In the repo:** `POST /ode/send` with `"useCase":"uc04a"` sends the UC04a interaction-1 referral with our own copy of the two photos (seed it first with `POST /ode/admin/seed?useCase=uc04a`); `POST /ode/receive/uc07` receives a UC07 referral; every receipt carries its use case; the page has Received (filter), Send a referral and Sent tabs. Testers can play a different organization per use case (`organizationsByUseCase`).
+- **VERIFIED in the sandbox:** 175 automated tests; real-HAPI end-to-end for UC07 receive (8 checks) and UC04a receive (21 checks) with an independent sender; a Chromium check of the new tabs (18 checks) that sent the UC04a referral to a stand-in tester, showed it on the Sent tab, and showed a received UC07 referral with both radiographs.
+- **NOT VERIFIED:** the live VM with these changes; any real tester receiving a UC04a referral or pulling its photos from this server (the entitlement rule is unit-tested, and the ARex content server was tested for UC07 only).
+- **Known limit:** received payloads and the data we send from share one HAPI, so a tester sending us the sample under the same ids overwrites our copy; reload the data before sending.
+- **Also fixed:** an unknown host in a payload is now `HOST_NOT_FOUND` (not `UNSAFE_URL_REFUSED`), and the page says when a Subscription was dropped.
+
+## UC04a receiver and viewer (S6, S7; `facade/`)
 - **In the repo:** `POST /ode/receive/uc04a` receives a UC04a interaction 1 payload, stores it in HAPI and pulls the ARex image manifest from the sender; `/viewer/` shows the result; `/arex/jwks.json` and `/ode/identity` publish our key. Guide: `docs/UC04A_SENDING_GUIDE.md`.
 - **VERIFIED in the sandbox:** 161 automated tests; end-to-end against real HAPI 8.12.0 with the real UC04a data and an independent Python sender (21 checks, 21 passed, for the authored, no-Subscription and filtered-Subscription variants); a Chromium check of the viewer (18 passed), including a hostile receipt that ran no script.
 - **FOUND:** real HAPI refuses the UC04a Subscription (HAPI-0011). The facade now stores the other 29 entries and reports `SUBSCRIPTION_NOT_STORED`. **Owner decision open:** fix the data or keep this tolerance (O9).

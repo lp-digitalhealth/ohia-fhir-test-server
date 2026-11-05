@@ -97,3 +97,24 @@ figure { margin: 0; max-width: 320px; }
 figure img { display: block; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: #ffffff; }
 figcaption { color: var(--muted); font-size: 0.85rem; margin-top: 4px; word-break: break-word; }
 .empty { color: var(--muted); }
+.muted { color: var(--muted); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.field { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; }
+.tabs { max-width: 1000px; margin: 16px auto 0; display: flex; flex-wrap: wrap; gap: 8px; }
+button.tab { background: transparent; color: var(--accent); }
+button.tab[aria-pressed="true"] { background: var(--accent); color: #ffffff; }
+select, input[type="text"] {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+.field select, .field input { width: 100%; }
+select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: 0.55; cursor: default; }
+/* The send form is a column of labelled fields, not the one-line token form. */
+#send-form { display: block; }
+.field input, .field select { flex: none; width: 100%; max-width: 640px; }

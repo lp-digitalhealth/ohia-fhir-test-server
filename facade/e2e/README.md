@@ -26,6 +26,8 @@ API_TOKEN=$API_TOKEN E2E_PAYLOAD=authored python3 e2e/run_uc04a_e2e.py      # au
 API_TOKEN=$API_TOKEN FACADE_DATA_DIR=/tmp/e2e/data SHOTS=/tmp/shots node e2e/viewer_check.js   # needs Playwright
 ```
 
+`run_uc07_receive_e2e.py` does the same for a UC07 referral (`POST /ode/receive/uc07`). `ui_check.js` drives the page's Send, Sent and Received tabs against the real facade with a stand-in tester on port 9300; start the facade with a registry that lists a tester `tester-ui` whose `allowedTargetPrefixes` is `http://127.0.0.1:9300/fhir` and whose `organizationsByUseCase` maps `uc04a` to `Organization/org-barton-springs-dental`, run `run_uc07_receive_e2e.py` first (it leaves a UC07 receipt), and start from an empty data folder (the check begins with "data not loaded").
+
 `authored` is the data as published: real HAPI refuses its Subscription, so 29 entries are stored and `SUBSCRIPTION_NOT_STORED` is reported. Run the browser check after the Python runner (it opens a receipt that run leaves).
 
 The two `--facade.send.*` flags exist for tests only (the stand-in receiver is plain http on 127.0.0.1). Never set them on a real deployment.

@@ -15,7 +15,22 @@ import org.ohia.facade.arexclient.ArexClient;
  */
 public record Receipt(String id, Instant receivedAt, String referralId, String manifestId, boolean accepted,
         int hapiEntries, String sender, String tokenEndpoint, String authorizationDetailsType, String stoppedBecause,
-        List<ArexClient.Step> steps, List<ReceiptObject> objects, List<ArexClient.Finding> findings) {
+        List<ArexClient.Step> steps, List<ReceiptObject> objects, List<ArexClient.Finding> findings, String useCase) {
+
+    /** A receipt with no use case named is UC04a (the only kind there was before UC07 could be received). */
+    public Receipt(String id, Instant receivedAt, String referralId, String manifestId, boolean accepted, int hapiEntries,
+            String sender, String tokenEndpoint, String authorizationDetailsType, String stoppedBecause,
+            List<ArexClient.Step> steps, List<ReceiptObject> objects, List<ArexClient.Finding> findings) {
+        this(id, receivedAt, referralId, manifestId, accepted, hapiEntries, sender, tokenEndpoint, authorizationDetailsType,
+                stoppedBecause, steps, objects, findings, null);
+    }
+
+    /** Receipts written before UC07 could be received are all UC04a. */
+    public Receipt {
+        if (useCase == null || useCase.isBlank()) {
+            useCase = "uc04a";
+        }
+    }
 
     /**
      * One content object. {@code entryId} is what the sender called it (display text only);

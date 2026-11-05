@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import org.ohia.facade.common.NotSeededException;
+import org.ohia.facade.common.UseCase;
 import org.ohia.facade.common.UpstreamException;
 import org.ohia.facade.hapi.HapiClient;
 import org.springframework.stereotype.Service;
@@ -30,14 +31,18 @@ public class PackageReader {
     }
 
     public ObjectNode readBundle() {
-        PackageIndex index = store.load().orElseThrow(NotSeededException::new);
+        return readBundle(UseCase.UC07);
+    }
+
+    public ObjectNode readBundle(UseCase useCase) {
+        PackageIndex index = store.load(useCase).orElseThrow(() -> new NotSeededException(useCase));
         ObjectNode bundle = mapper.createObjectNode();
         bundle.put("resourceType", "Bundle");
         bundle.put("type", "transaction");
         ArrayNode entries = bundle.putArray("entry");
         for (PackageIndex.Res r : index.resources()) {
             String json = hapi.read(r.type(), r.id()).orElseThrow(() -> new UpstreamException(404,
-                    "HAPI does not have " + r.type() + "/" + r.id() + ". Re-seed with POST /ode/admin/seed."));
+                    "HAPI does not have " + r.type() + "/" + r.id() + ". Re-seed with POST /ode/admin/seed?useCase=" + useCase.id() + "."));
             ObjectNode resource = parseObject(json);
             stripServerMeta(resource);
             ObjectNode entry = entries.addObject();
