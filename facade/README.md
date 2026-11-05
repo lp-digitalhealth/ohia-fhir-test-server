@@ -71,6 +71,7 @@ Docker (as the compose file does it): `docker compose build facade`.
 - **Receive UC07:** `POST /ode/receive/uc07`. `GET /ode/receipts?useCase=uc07` filters. `GET /ode/clients` lists the registered testers for the send form (never their keys).
 - **The page (`/viewer/`):** tabs for Received (with a use-case filter), Send a referral and Sent.
 - **Image viewer:** every image on the page (received, about to be sent, or carried by a past send) opens in one viewer with its name, type, size and SHA-256, next and previous (buttons or arrow keys), "Actual size", and Esc to close. Sent images come from `GET /ode/package/images/{useCase}/{entryId}` and `GET /ode/sends/{sendId}/images/{entryId}`; a send's manifest (`GET /ode/manifests/{id}`) now lists its entries. Bytes are shown inline only if they really are a JPEG or PNG; anything else is a download.
+- **CapabilityStatement:** `GET /fhir/metadata` (open) returns the facade's statement of the capability this test server is going for, from `src/main/resources/capability/capability-statement.json` (edit it as data). It is draft and experimental and says what is implemented today and what is only the target. Caddy falls back to HAPI's own statement if the facade is down.
 - **Known limit:** received payloads and the data we send from share one HAPI. A tester who sends us the sample referral under the same resource ids overwrites our copy of it. Use "Load the data" (or `POST /ode/admin/seed?useCase=...`) before sending to restore it.
 
 ## Known limits

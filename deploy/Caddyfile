@@ -57,8 +57,17 @@
 	}
 
 	# /fhir: handle blocks are mutually exclusive and are tried in this order.
+	# The capability statement is the facade's (a test server states the capability it is going for; see
+	# facade/src/main/resources/capability). It is tried first. If the facade is down, the request goes to HAPI
+	# and returns HAPI's own statement, so a facade problem still cannot take FHIR discovery away.
 	handle @meta {
-		reverse_proxy hapi:8080
+		reverse_proxy facade:8080 hapi:8080 {
+			lb_policy first
+			lb_try_duration 3s
+			lb_try_interval 250ms
+			max_fails 1
+			fail_duration 30s
+		}
 	}
 	handle @preflight {
 		reverse_proxy hapi:8080
