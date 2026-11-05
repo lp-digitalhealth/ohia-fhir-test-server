@@ -251,7 +251,8 @@ That is a separate guide: `docs/AREX_RETRIEVAL_GUIDE.md` (with a tested script, 
 | What happened (or the trap) | Cause | Fix |
 |---|---|---|
 | `POST /ode/admin/seed` returned 404 in the first end-to-end run | the running jar was built **before** the seed code existed; `mvn test` does not rebuild the jar | run `mvn -q package -DskipTests` before running the jar. Note `mvn clean` **deletes** the jar. |
-| `docker build` of the facade failed with a PKIX certificate error in the sandbox | the sandbox's TLS-intercepting proxy is not trusted by Maven inside the build container | do **not** disable TLS. Build the jar on the host and package it into a runtime-only image to test everything else. The real multi-stage `Dockerfile` is therefore **untested** until it runs on a normal network. |
+| `docker build` of the facade failed with a PKIX certificate error in the sandbox | the sandbox's TLS-intercepting proxy is not trusted by Maven inside the build container | do **not** disable TLS. Build the jar on the host and package it into a runtime-only image to test everything else. The real multi-stage `Dockerfile` could therefore not be built in the sandbox; the owner built it on the Arm VM (no proxy) and it worked. |
+| the container showed `Up ... (unhealthy)` on the VM although the app was fine | the `HEALTHCHECK` grepped for the text `200 OK`, but Tomcat sends `HTTP/1.1 200` with no reason phrase, so the probe failed every time. It was never run before shipping because the sandbox test image had no health check | match the status code (`^HTTP/1\.[01] 200`). **Run the probe before you ship it:** `docker run --health-cmd '<the exact command>' ...` shows Docker's verdict without a build. Also test that it **fails** for a 404 and for a closed port. |
 | every image request would have been refused | the authored manifest's `arex-expires` was **already in the past** (2026-07-22) | the per-send copy sets a fresh expiry |
 | a unit test showed a dangling `Organization/...` reference | the registered tester's organization was not an organization in the package | refuse the send up front (step 5) and test the refusal |
 | a refusal test got the wrong error message | the allow-list prefix `https://localhost` does not cover `https://localhost:9`, so the allow-list refused first | add the exact prefixes, so the address check is what refuses |
@@ -304,8 +305,8 @@ That is a separate guide: `docs/AREX_RETRIEVAL_GUIDE.md` (with a tested script, 
 - The retrieval script and the curl flow in `docs/AREX_RETRIEVAL_GUIDE.md`, including a tampered digest, a refused key, a retracted manifest and the token-expiry retry.
 
 **Not verified:**
-- The multi-stage `facade/Dockerfile` (see section 4).
-- Anything on the Oracle Arm VM, the facade behind the live Caddy and certificate, and any real tester's receiver.
+- The **fixed** `facade/Dockerfile` health probe on the VM (the original multi-stage build did build and run there; the probe bug is described in section 4; the fix was tested with the equivalent run-time probe in the sandbox, not through a build, because Docker Hub rate-limited the sandbox).
+- The facade behind the live Caddy and certificate, and any real tester's receiver.
 - The Bundle shape. It is an inference from the draft ODE IG, which has no UC07 page.
 - ARex conformance beyond the statements listed in 1.2, and the exact spec wording (see 1.2).
 - ODE profile conformance (the profiles are unbuilt).

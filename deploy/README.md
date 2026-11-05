@@ -101,4 +101,5 @@ curl -s -H "Authorization: Bearer $TOKEN" $BASE/ode/sends                       
 ```
 
 - **Tested:** 94 automated tests, plus an end-to-end run in the sandbox against real HAPI 8.12.0 and the real data repository at the pinned commit (21 checks, all passed), with Caddy routing tested in front of a stand-in HAPI.
-- **Not tested:** the multi-stage `facade/Dockerfile` (the sandbox's proxy blocks Maven inside Docker builds), anything on the Arm VM, the facade behind the live Caddy and certificate, and any real tester's receiver. Expect to send me the output if the first `docker compose build facade` fails.
+- **Observed on the Arm VM (2026-11-05):** `docker compose build facade` succeeded and the container ran. Its Docker health check first reported `unhealthy` because of a probe bug (it searched for the text `200 OK`; Tomcat sends `HTTP/1.1 200`). The `Dockerfile` is fixed; after `git pull`, run `docker compose build facade` and `docker compose up -d` again and `docker compose ps` should show `healthy`.
+- **Not tested:** the facade behind the live Caddy and certificate (check `/ode/health` and `/arex/.well-known/smart-configuration`), and any real tester's receiver.
