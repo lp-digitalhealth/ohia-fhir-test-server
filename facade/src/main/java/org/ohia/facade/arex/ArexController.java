@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.ohia.facade.keys.ServerKeyStore;
 import org.ohia.facade.send.ManifestRecord;
 import org.ohia.facade.send.PerSendCopier;
 import org.ohia.facade.seed.PackageStore;
@@ -46,9 +47,11 @@ public class ArexController {
     private final ArexAccess access;
     private final PackageStore store;
     private final ObjectMapper mapper;
+    private final ServerKeyStore keys;
 
     public ArexController(ArexTokenService tokenService, AccessTokenStore tokens, ArexAccess access,
-            PackageStore store, ObjectMapper mapper) {
+            PackageStore store, ObjectMapper mapper, ServerKeyStore keys) {
+        this.keys = keys;
         this.tokenService = tokenService;
         this.tokens = tokens;
         this.access = access;
@@ -67,6 +70,15 @@ public class ArexController {
         m.put("scopes_supported", List.of("system/Binary.r", "system/List.rs"));
         m.put("authorization_details_types_supported", List.of(ArexTokenService.DETAILS_TYPE));
         return m;
+    }
+
+    /**
+     * Our own PUBLIC key, so a sender can verify the client assertions we sign when we pull from
+     * their ARex server. Open (no token), like the discovery document. Never contains private parts.
+     */
+    @GetMapping(value = "/arex/jwks.json", produces = "application/jwk-set+json")
+    public String jwks() {
+        return keys.publicJwks().toString();
     }
 
     @PostMapping(value = "/arex/auth/token", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)

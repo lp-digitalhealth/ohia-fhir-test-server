@@ -30,6 +30,14 @@
 	# paths return 502 and nothing else is affected.
 	@arex path /arex /arex/*
 	@ode path /ode /ode/*
+	@viewer path /viewer /viewer/*
+
+	# The received-payloads page is static and holds no data and no secrets: it asks the person for the
+	# shared token and calls /ode/* with it. So it loads without a token (a browser cannot send one for
+	# a page load), and the facade sets its strict browser protections.
+	handle @viewer {
+		reverse_proxy facade:8080
+	}
 
 	# ARex content and its OAuth token endpoint use their own SMART Backend Services tokens,
 	# so they are not behind the shared token. The facade enforces them.

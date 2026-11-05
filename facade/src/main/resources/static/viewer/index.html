@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Received payloads</title>
+  <link rel="stylesheet" href="viewer.css">
+</head>
+<body>
+  <header class="top">
+    <h1>Received payloads</h1>
+    <p class="sub">UC04a referrals this server received, and the images it pulled with ARex.</p>
+  </header>
+
+  <section class="card" aria-labelledby="auth-h">
+    <h2 id="auth-h">Access</h2>
+    <p class="note">This page holds no data. Enter the shared access token to load results. It is kept only in this browser tab and sent only to this server.</p>
+    <form id="auth-form" autocomplete="off">
+      <label for="token">Access token</label>
+      <input id="token" name="token" type="password" autocomplete="off" spellcheck="false">
+      <button type="submit" id="load">Load</button>
+      <button type="button" id="forget" class="secondary">Forget token</button>
+    </form>
+    <p id="message" class="message" role="status" aria-live="polite"></p>
+  </section>
+
+  <main>
+    <section class="card" aria-labelledby="list-h">
+      <h2 id="list-h">Receipts</h2>
+      <p><button type="button" id="refresh" class="secondary">Refresh</button></p>
+      <div id="list" class="scroll"></div>
+    </section>
+
+    <section class="card" id="detail-card" aria-labelledby="detail-h" hidden>
+      <h2 id="detail-h">Receipt</h2>
+      <div id="detail"></div>
+    </section>
+  </main>
+
+  <script src="viewer.js"></script>
+</body>
+</html>

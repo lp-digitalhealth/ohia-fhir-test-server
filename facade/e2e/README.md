@@ -17,5 +17,16 @@ python3 e2e/run_e2e.py /tmp/e2e                  # prints PASS/FAIL per check; e
 docker rm -f e2e-hapi
 ```
 
+## UC04a receiver and viewer
+
+`run_uc04a_e2e.py` sends the real UC04a bundle to `/ode/receive/uc04a` with an independent Python sender (`uc04a_sender_stub.py`, PyJWT) that verifies the facade's signed assertion with the key from `/arex/jwks.json`. Start HAPI and the facade as above (no clients file needed), then:
+
+```bash
+API_TOKEN=$API_TOKEN E2E_PAYLOAD=authored python3 e2e/run_uc04a_e2e.py      # authored | no-subscription | with-filter
+API_TOKEN=$API_TOKEN FACADE_DATA_DIR=/tmp/e2e/data SHOTS=/tmp/shots node e2e/viewer_check.js   # needs Playwright
+```
+
+`authored` is the data as published: real HAPI refuses its Subscription, so 29 entries are stored and `SUBSCRIPTION_NOT_STORED` is reported. Run the browser check after the Python runner (it opens a receipt that run leaves).
+
 The two `--facade.send.*` flags exist for tests only (the stand-in receiver is plain http on 127.0.0.1). Never set them on a real deployment.
 If a proxy intercepts localhost traffic, set `no_proxy=localhost,127.0.0.1`.
