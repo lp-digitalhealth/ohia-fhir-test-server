@@ -72,4 +72,33 @@ docker compose pull && docker compose up -d   # update
 - **Adding it to a server that is already running:** edit `.env`, then `git pull` and `docker compose up -d`. Only the `caddy` container restarts; HAPI and the database keep their data.
 - **Rotating it:** put a new value in `.env`, run `docker compose up -d`, and give the new token to your testers. The old token stops working at once.
 - **Limits:** everyone shares one secret; there are no scopes, no per-user audit and no expiry. A leak gives full read and write access. The match is **case-sensitive**: the header must say `Bearer` exactly, and tokens must match exactly.
-- **Tested** (against a stand-in upstream, not real HAPI): 401 without a token, with a wrong, shortened or extended token, and for writes; 200 with the right token; metadata and `OPTIONS` open; path tricks such as `metadata/../Patient` rejected; Compose refuses to start without `API_TOKEN`. **Not tested:** the live stack with real HAPI behind it, browser CORS behavior, and per-request timing.
+- **Tested on a stand-in upstream:** 401 without a token, with a wrong, shortened or extended token, and for writes; 200 with the right token; metadata and `OPTIONS` open; path tricks such as `metadata/../Patient` rejected; Compose refuses to start without `API_TOKEN`.
+- **Tested on the live server (real HAPI, Oracle Arm VM, 2026-11-04):** metadata 200 and Patient 401 without a token, Patient 200 with it, and a write without a token 401. **Not tested:** browser CORS behavior, the wrong-token and case-sensitivity cases on the live server, and load.
+
+## 8. The facade (UC07 sender and ARex content server)
+
+A Java service in `../facade` runs beside HAPI and is routed by Caddy at `/ode/*` and `/arex/*` only; `/fhir` does not pass through it. What it does, its endpoints and the ARex rules it enforces are in `facade/README.md`. Decisions: S3, S4 and S5 in `docs/OHIA_FHIR_Test_server_PLAN.md`.
+
+**Rolling it out on the VM.** Build before starting, so a build problem cannot touch the running stack:
+
+```bash
+git pull
+docker compose build facade      # builds the Java image on the VM (first build downloads Maven dependencies)
+docker compose up -d             # starts the facade and reloads Caddy's routes; HAPI and the database are not recreated
+docker compose ps                # facade should become healthy
+```
+
+**Registering a tester** (the organizer does this): copy `facade/config/clients.example.json` to `facade/config/clients.json`, fill in the tester's client id, organization, allowed target URL prefixes and public key, and save. No restart is needed. That file is git-ignored.
+
+**Using it** (organizer, with the shared token from `.env`):
+
+```bash
+BASE=https://<your-hostname>
+curl -s -X POST -H "Authorization: Bearer $TOKEN" $BASE/ode/admin/seed                       # once: load the UC07 package into HAPI
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"clientId":"tester-example","targetBaseUrl":"https://tester.example.org/fhir"}' $BASE/ode/send
+curl -s -H "Authorization: Bearer $TOKEN" $BASE/ode/sends                                   # delivery log
+```
+
+- **Tested:** 94 automated tests, plus an end-to-end run in the sandbox against real HAPI 8.12.0 and the real data repository at the pinned commit (21 checks, all passed), with Caddy routing tested in front of a stand-in HAPI.
+- **Not tested:** the multi-stage `facade/Dockerfile` (the sandbox's proxy blocks Maven inside Docker builds), anything on the Arm VM, the facade behind the live Caddy and certificate, and any real tester's receiver. Expect to send me the output if the first `docker compose build facade` fails.

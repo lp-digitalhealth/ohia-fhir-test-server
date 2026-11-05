@@ -24,7 +24,31 @@
 	# Everything else must present the shared token.
 	@authed header Authorization "Bearer {$API_TOKEN}"
 
-	# handle blocks are mutually exclusive and are tried in this order.
+	# Facade paths (Java service beside HAPI). Declared first because @authed below matches
+	# any path. The /fhir routes further down never pass through the facade, so a facade
+	# problem cannot break or open the FHIR API. If the facade container is down, these two
+	# paths return 502 and nothing else is affected.
+	@arex path /arex /arex/*
+	@ode path /ode /ode/*
+
+	# ARex content and its OAuth token endpoint use their own SMART Backend Services tokens,
+	# so they are not behind the shared token. The facade enforces them.
+	handle @arex {
+		reverse_proxy facade:8080
+	}
+	# Organizer endpoints (seed, send, delivery log): shared token here, and checked again
+	# inside the facade.
+	handle @ode {
+		handle @authed {
+			reverse_proxy facade:8080
+		}
+		handle {
+			header WWW-Authenticate Bearer
+			respond "Unauthorized: send Authorization: Bearer <token>" 401
+		}
+	}
+
+	# /fhir: handle blocks are mutually exclusive and are tried in this order.
 	handle @meta {
 		reverse_proxy hapi:8080
 	}

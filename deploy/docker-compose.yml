@@ -38,6 +38,28 @@ services:
       HAPI_FHIR_SERVER_ADDRESS: ${PUBLIC_BASE_URL:-http://localhost:8080}/fhir
     # No published ports: reachable only through Caddy.
 
+  # Java facade: UC07 ODE referral sender and ARex content server. Built from ../facade.
+  # Not published: reachable only through Caddy (/ode/* and /arex/*). Caddy does not depend
+  # on it, so if it fails the /fhir API keeps working. Build it first on a new rollout
+  # (docker compose build facade) so a build failure cannot interrupt the running stack.
+  facade:
+    build: ../facade
+    image: ohia-facade:local
+    restart: unless-stopped
+    depends_on:
+      - hapi
+    environment:
+      FACADE_HAPI_BASE_URL: http://hapi:8080/fhir
+      FACADE_PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost}
+      # The same shared token Caddy enforces; the facade checks it again on /ode/**.
+      API_TOKEN: ${API_TOKEN:?set API_TOKEN in .env (openssl rand -hex 32)}
+    volumes:
+      - facade_data:/data
+      # The tester registry lives at facade/config/clients.json (not in git; see
+      # facade/config/clients.example.json). Mounted as a folder so a missing file means
+      # "nobody registered" rather than Docker creating a directory in its place.
+      - ../facade/config:/config:ro
+
   caddy:
     image: ${CADDY_IMAGE:-caddy:2-alpine}
     restart: unless-stopped
@@ -58,5 +80,6 @@ services:
 
 volumes:
   pgdata:
+  facade_data:
   caddy_data:
   caddy_config:

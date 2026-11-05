@@ -62,7 +62,65 @@ Invoke-RestMethod -Method Post -Uri "$env:OHIA_BASE/Patient" -Headers $h -Conten
 
 **Postman and similar tools:** set the base URL, choose Authorization type **Bearer Token** and paste the token. Add `Accept: application/fhir+json`. For writes add `Content-Type: application/fhir+json`.
 
-**FHIR client libraries:** configure a bearer-token (or custom `Authorization`) header on the client. The server does not use OAuth yet, so don't configure a token endpoint or client ID.
+**FHIR client libraries (for `/fhir`):** configure a bearer-token (or custom `Authorization`) header on the client. `/fhir` does not use OAuth yet, so don't configure a token endpoint or client ID there. The ARex image endpoints under `/arex` **do** use OAuth; see the next section.
+
+## UC07: receive the referral and fetch the radiographs
+
+In UC07 **this server plays the referring practice (the sender)** and **you play the receiving practice**. The organizer triggers a send to your FHIR endpoint. You then fetch the referral's radiographs from this server using ARex.
+
+### 1. Register once with the organizer
+Send the organizer these four things (never your private key):
+1. A **client id** you choose (letters, digits, `.`, `_`, `-`).
+2. The organization you play. For UC07 that is `Organization/org-restorative-dental-tx`.
+3. Your **FHIR base URL**, which must be `https://` and publicly reachable. The server refuses to send to private or local addresses and only to URLs you registered.
+4. Your **public key as a JWK**, either RSA of 2048 bits or more (signs with RS384) or EC P-384 (signs with ES384). A quick way to make an RSA pair in Python (needs the `cryptography` package):
+
+```python
+import base64
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
+key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+b64 = lambda i: base64.urlsafe_b64encode(i.to_bytes((i.bit_length() + 7) // 8, "big")).rstrip(b"=").decode()
+n = key.public_key().public_numbers()
+print({"kty": "RSA", "kid": "my-key-1", "alg": "RS384", "use": "sig", "n": b64(n.n), "e": b64(n.e)})   # send this
+open("my-private-key.pem", "wb").write(key.private_bytes(serialization.Encoding.PEM,
+    serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))                                 # keep this secret
+```
+
+### 2. Receive the referral
+When the organizer sends, your endpoint gets **one** request:
+- `POST <your FHIR base URL>` with `Content-Type: application/fhir+json`.
+- The body is a FHIR `Bundle` of type `transaction` with 37 entries, each a `PUT` of one resource: the referral `ServiceRequest` and coordination `Task`, the patient and practitioners, clinical notes and imaging pointers, a payer-notification `Communication`, and the ARex manifest (a `List`) with its two content entries (`DocumentReference`).
+- If your endpoint needs a bearer token, give it to the organizer. It is used for that one call and is not stored or logged.
+- **Answer with a 2xx** when you accept it. If you refuse it, return an `OperationOutcome` with the reason; the organizer sees your status code and the start of your response.
+- **Every send is a new referral:** a new referral id (`REF-2026-UC07-001-<send id>`) and new ids for the referral, task and ARex resources. The patient, practitioners and organizations keep the same ids each time.
+- The Bundle shape is the server's reading of the draft ODE guide, which has no UC07 page. If your system expects something different, tell the organizer.
+
+### 3. Fetch the images (ARex)
+A fuller, standalone guide with a tested script is in `docs/AREX_RETRIEVAL_GUIDE.md`.
+
+The content URLs in the manifest need a token; anonymous access is never allowed. Base URL below is the server's address with no `/fhir`.
+
+1. **Discover:** `GET <base>/arex/.well-known/smart-configuration` and read `token_endpoint`.
+2. **Sign a client assertion (JWT):** header `alg` is `RS384` or `ES384` (add your `kid`). Claims: `iss` and `sub` = your client id, `aud` = the `token_endpoint` URL exactly, `exp` at most **5 minutes** ahead, and a unique `jti`. Each assertion works **once**.
+3. **Request a token:** `POST <token_endpoint>` as `application/x-www-form-urlencoded` with `grant_type=client_credentials`, `client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer`, `client_assertion=<your JWT>`, and `authorization_details=[{"type":"arex-manifest","manifest":"<id of the manifest List in the Bundle>"}]`. You may add `scope=system/List.rs system/Binary.r`. The answer has `access_token` (valid **300 seconds**) and `expires_in`.
+4. **Read the manifest (optional):** `GET <base>/arex/List/<manifest id>` with `Authorization: Bearer <access_token>`. You can also search by the referral: `GET <base>/arex/List?arex-manifest-transaction-identifier=urn:ohia:referral-id|<referral id>`.
+5. **Fetch each image:** `GET` the `content.attachment.url` of each content entry with the same bearer token. Send `Accept: image/png` for the raw bytes (or `Accept: application/fhir+json` for a FHIR `Binary`). HTTP `Range` requests work.
+6. **Verify:** the SHA-256 of what you downloaded must equal the digest in the entry's `arex-digest` extension, and its length must equal `attachment.size`. Do not use an object whose digest does not match.
+
+| You get | Meaning |
+|---|---|
+| `401 invalid_client` (token endpoint) | Something is wrong with your assertion: wrong key, algorithm, audience, lifetime, or you reused a `jti`. The message is the same for every cause on purpose. |
+| `400 invalid_request` | `authorization_details` is missing or not exactly one `arex-manifest` entry. |
+| `400 invalid_grant` | That manifest is not available to you: unknown, meant for someone else, expired, or retracted. These look identical on purpose. |
+| `400 invalid_scope` | Only `system/List.rs` and `system/Binary.r` are offered. |
+| `401` on a manifest or image | No token, a bad token, or the 5-minute token has expired. Get a new one (with a new assertion). |
+| `404` on a manifest or image | Not found **or not yours**, expired, or retracted. By design it never says which. |
+| `416` | Bad or unsatisfiable `Range`. |
+
+**Timing:** a token lasts 5 minutes. A manifest and its images stay retrievable for **30 days** from the send (the manifest's `arex-expires`), or until the organizer retracts it, whichever is first. After that, retrieval is refused even with a fresh token.
+
+**Good to know:** ARex is a **draft** specification (v0.2.0). The `authorization_details` type value `arex-manifest` is this server's own choice; tell the organizer if your client needs something else. The "radiographs" are 8x8 placeholder PNGs, and the manifest signature in the data is a placeholder.
 
 ## Good to know
 - **The server is shared.** Everyone with the token can read and change everyone's data. Give your resources an identifier or tag that identifies you or your organization, and don't rely on another tester's data staying unchanged.
