@@ -1,0 +1,23 @@
+server:
+  port: 8080
+
+facade:
+  hapi-base-url: ${FACADE_HAPI_BASE_URL:http://hapi:8080/fhir}
+  public-base-url: ${FACADE_PUBLIC_BASE_URL:http://localhost}
+  # The shared S1 token. Empty means every /ode/** request is refused.
+  api-token: ${API_TOKEN:}
+  data-dir: ${FACADE_DATA_DIR:/data}
+  # Tester registry (client id, requesting organization, allowed target URL prefixes, public key).
+  # Re-read automatically when the file changes. Missing file = nobody registered.
+  clients-file: ${FACADE_CLIENTS_FILE:/config/clients.json}
+  seed:
+    # Raw file host of the data repository. The ref is a pinned commit, not a branch, so the
+    # seeded data cannot change underneath us. Bump it deliberately when the data is updated.
+    data-base-url: ${FACADE_SEED_DATA_BASE_URL:https://raw.githubusercontent.com/lp-digitalhealth/ohia-test-data}
+    data-ref: ${FACADE_SEED_DATA_REF:445d4ce7460c6e62000e275da84258c84bfa873d}
+    package-path: 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-01
+  send:
+    # Both flags below exist for automated tests only and must stay false in a deployment.
+    allow-http: false
+    allow-private-targets: false
+    manifest-ttl-days: ${FACADE_MANIFEST_TTL_DAYS:30}

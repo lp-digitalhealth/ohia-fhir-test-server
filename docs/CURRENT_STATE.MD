@@ -1,7 +1,7 @@
 # CURRENT STATE
 This document is for coding assistants to put the current state of the repo
 
-**As of 2026-11-04 (evening).** The auth change is merged into `main` and `November_Testing`. Facts below are labeled VERIFIED (run and observed) or UNVERIFIED.
+**As of 2026-11-05.** The interim auth change (S1) is merged into `main` and is live. The Java facade (S3 to S5, section "Facade" below) is built and tested in a sandbox but **not deployed**. Facts are labeled VERIFIED (run and observed) or UNVERIFIED.
 
 ## Deployed server
 - **VERIFIED:** the generic stack in `deploy/` (HAPI FHIR JPA, PostgreSQL 16, Caddy) runs on an Oracle Cloud Arm VM (`VM.Standard.A2.Flex`, a paid shape, because Always Free A1 capacity was unavailable). OS Ubuntu 26.04.1 aarch64. Docker is Ubuntu's `docker.io` 29.1.3 with the Compose plugin 5.7.0.
@@ -17,10 +17,20 @@ This document is for coding assistants to put the current state of the repo
 - **VERIFIED earlier on a stand-in upstream (not real HAPI):** a wrong, shortened or extended token gives 401; lowercase `bearer` gives 401 (the match is case-sensitive); `OPTIONS` is open; writes to `/fhir/metadata` need the token; path tricks such as `metadata/../Patient` are rejected; Compose refuses to start without `API_TOKEN`.
 - **UNVERIFIED:** browser CORS behavior against real HAPI, the case-sensitivity and wrong-token cases on the live server, and load.
 - **Operations:** the token lives only in the VM's `deploy/.env` (never in git) and with the owner. To roll out or rotate it, edit `API_TOKEN` in `.env` and run `docker compose up -d` (see `deploy/README.md` section 7).
-- **Revisit in January 2027:** replace the shared token with the real design (SMART backend services and standalone launch, F9 and M1). Needs O1 first.
+- **Revisit in January 2027:** replace the shared token with the real design (SMART backend services and standalone launch, F9 and M1). O1 is resolved (S3), so the facade exists and could take this over.
+
+## Facade: UC07 sender and ARex content server (S3, S4, S5; `facade/`)
+- **In the repo (branch `November_Testing_Server_Setup`):** a Java 21 / Spring Boot service beside HAPI. Caddy routes only `/ode/*` and `/arex/*` to it; `/fhir` is unchanged. See `facade/README.md` and `deploy/README.md` section 8.
+- **VERIFIED in the sandbox:** 94 automated tests pass (token lock, seed, read-back, per-send copy, send, SSRF refusals, registry, ARex tokens and content). Three security rules were mutation-checked (a deliberate break of manifest expiry, replay protection and manifest scoping each makes a test fail).
+- **VERIFIED end to end in the sandbox (21 checks):** against real HAPI 8.12.0 and the data repository at the pinned commit (`445d4ce`), a stand-in tester using a different JWT library (PyJWT) received the referral, got an ARex token, read the manifest, fetched both images with matching SHA-256 digests and ranges, and lost access on retraction.
+- **VERIFIED:** Caddy routing for `/fhir`, `/ode` and `/arex` against the Phase 1 facade and a stand-in HAPI. `/fhir` behavior was identical to the live server's.
+- **UNVERIFIED / NOT DONE:** the multi-stage `facade/Dockerfile` (the sandbox proxy blocks Maven inside Docker builds), anything on the Arm VM, the facade behind the live Caddy and certificate, any real tester's receiver, and ODE conformance (the profiles are unbuilt).
+- **Sender wire format is an inference** from the ODE IG's initiator CapabilityStatement (draft 0.1.0, no UC07 page). **ARex** is the v0.2.0 draft; the `authorization_details` type `arex-manifest`, 300-second tokens and the static client registry are this server's choices.
+- **Not built:** UC07 interactions 2 and 4, an automatic way to register testers, and token issuing for `/fhir`.
+- **Rollout (manual, owner):** `git pull`, `docker compose build facade`, `docker compose up -d`, then register a tester in `facade/config/clients.json` and seed (see `deploy/README.md` section 8).
 
 ## For testers
 `docs/CONSUMER_GUIDE.md` explains how to connect.
 
 ## Not built yet (see the plan, sections 7 and 8)
-Role base paths, CRD/DTR/PAS, 360X receiver, ODE referral validation feedback, SMART/OAuth, the milestone H spike, and the UC07 test data.
+Role base paths, CRD/DTR/PAS, the 360X receiver (not needed for UC07, see S4), ODE referral validation feedback, SMART/OAuth for `/fhir`, the milestone H spike, and UC07 interactions 2 and 4 (interaction 1 exists in the data repo and is what the facade sends).
