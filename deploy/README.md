@@ -124,6 +124,9 @@ Plan items S8 to S10. After the usual update (`git pull`, `docker compose build 
 2. Open `/viewer/`, enter the token, go to **Send a referral**, choose UC04a, click **Load the data** once, pick the tester, check the address, click **Send referral** and confirm.
 3. Testers send you a UC07 referral with `POST /ode/receive/uc07` (same token as UC04a). It appears on the **Received** tab; filter by use case.
 
-- **Tested in the sandbox:** 175 automated tests; end-to-end against real HAPI 8.12.0 for UC04a receive (21 checks) and UC07 receive (8 checks) with an independent Python sender; a Chromium check of the new tabs (18 checks), including sending to a stand-in tester.
+- **A tester gets a 502 on the receive endpoint:** read the reply's `"error"` text and `docker compose logs --since 30m -t hapi`. `HAPI-0507 ... external reference` means their Bundle's references point at an address that is not ours; `docker-compose.yml` declares our own addresses as local (`HAPI_FHIR_LOCAL_BASE_URLS_*`), so after `docker compose up -d` (this recreates HAPI) only references to other servers are refused.
+- **Capability statement:** `GET /fhir/metadata` is now the facade's statement of the target capability (open, no token). This changes the Caddyfile, so after `git pull` and the facade rebuild run `docker compose up -d --force-recreate caddy` (see section 9), then check `curl -s https://<your-hostname>/fhir/metadata | head -c 300`: it should say `OHIA FHIR test server (November testing): target capability`. If the facade is down, Caddy answers with HAPI's own statement instead.
+- **Images:** click any image on the page to open the viewer (next/previous, actual size, checksum). The Send tab previews what will go out; the Sent tab has an Images link per send.
+- **Tested in the sandbox:** 179 automated tests; end-to-end against real HAPI 8.12.0 for UC04a receive (21 checks) and UC07 receive (8 checks) with an independent Python sender; a Chromium check of the new tabs (18 checks), including sending to a stand-in tester.
 - **Not tested:** the live VM with these changes, and any real tester receiving a UC04a referral or pulling its photos from this server.
 

@@ -11,7 +11,7 @@
 
   var TOKEN_KEY = 'ohiaViewerToken';
   var token = '';
-  var blobUrls = [];
+  var blobGroups = { received: [], send: [], sent: [] };
 
   function $(id) { return document.getElementById(id); }
 
@@ -126,9 +126,9 @@
     dl.appendChild(el('dd', value === null || value === undefined || value === '' ? '(none)' : value));
   }
 
-  function releaseBlobs() {
-    blobUrls.forEach(function (u) { URL.revokeObjectURL(u); });
-    blobUrls = [];
+  function releaseBlobs(group) {
+    blobGroups[group].forEach(function (u) { URL.revokeObjectURL(u); });
+    blobGroups[group] = [];
   }
 
   function showDetail(id) {
@@ -140,7 +140,7 @@
   }
 
   function renderDetail(r) {
-    releaseBlobs();
+    releaseBlobs('received');
     $('detail-card').hidden = false;
     var host = $('detail');
     clear(host);
@@ -198,9 +198,13 @@
 
       var thumbs = el('div', null, 'thumbs');
       host.appendChild(thumbs);
-      r.objects.forEach(function (o) {
-        if (o.viewable && o.fileKey) { addThumb(thumbs, r.id, o); }
-      });
+      addThumbs(thumbs, 'received', r.objects.filter(function (o) { return o.viewable && o.fileKey; }).map(function (o) {
+        return {
+          path: '/ode/receipts/' + encodeURIComponent(r.id) + '/images/' + encodeURIComponent(o.fileKey),
+          label: o.entryId,
+          meta: (o.sniffedType || '') + ', ' + o.bytes + ' bytes, sha-256 ' + (o.sha256 || '')
+        };
+      }));
     }
 
     host.appendChild(el('h3', 'Steps'));
@@ -215,36 +219,113 @@
     host.appendChild(steps);
   }
 
-  function addThumb(host, receiptId, o) {
+  // ---------------------------------------------------------------- images
+
+  // An item is { path, label, meta, url }. The picture is fetched with the token and shown from a blob: URL, and only
+  // if the server says it is a JPEG or PNG (the server decides that from the bytes). Anything else is not shown.
+  function addThumbs(host, group, items) {
+    items.forEach(function (item, index) { addThumb(host, group, items, index); });
+  }
+
+  function addThumb(host, group, items, index) {
+    var item = items[index];
     var fig = el('figure');
-    var caption = el('figcaption', o.entryId + ' (' + o.sniffedType + ', ' + o.bytes + ' bytes)');
+    var caption = el('figcaption', item.label + (item.meta ? ' (' + item.meta.split(', sha-256')[0] + ')' : ''));
     fig.appendChild(caption);
     host.appendChild(fig);
-    fetch('/ode/receipts/' + encodeURIComponent(receiptId) + '/images/' + encodeURIComponent(o.fileKey),
-      { headers: { 'Authorization': 'Bearer ' + token }, cache: 'no-store' })
+    fetch(item.path, { headers: { 'Authorization': 'Bearer ' + token }, cache: 'no-store' })
       .then(function (r) {
         var type = r.headers.get('Content-Type') || '';
         if (!r.ok || (type !== 'image/jpeg' && type !== 'image/png')) { throw new Error('not shown: the server did not mark it as an image'); }
         return r.blob();
       })
       .then(function (blob) {
-        var url = URL.createObjectURL(blob);
-        blobUrls.push(url);
+        item.url = URL.createObjectURL(blob);
+        blobGroups[group].push(item.url);
+        var button = el('button', null, 'thumb');
+        button.type = 'button';
+        button.setAttribute('aria-label', 'Enlarge ' + item.label);
         var img = document.createElement('img');
-        img.alt = 'Image ' + o.entryId;
-        img.src = url;
-        fig.insertBefore(img, caption);
+        img.alt = 'Image ' + item.label;
+        img.src = item.url;
+        button.appendChild(img);
+        button.addEventListener('click', function () { openLightbox(items, index, button); });
+        fig.insertBefore(button, caption);
       })
-      .catch(function (e) { caption.textContent = o.entryId + ': ' + e.message; });
+      .catch(function (e) { item.url = null; caption.textContent = item.label + ': ' + e.message; });
   }
 
+  // ---------------------------------------------------------------- lightbox
+
+  var lb = { items: [], index: 0, opener: null };
+
+  function lightboxOpen() { return !$('lightbox').hidden; }
+
+  function shownItems() { return lb.items.filter(function (i) { return i.url; }); }
+
+  function renderLightbox() {
+    var list = shownItems();
+    var item = list[lb.index];
+    if (!item) { closeLightbox(); return; }
+    $('lightbox-title').textContent = item.label;
+    $('lightbox-meta').textContent = item.meta || '';
+    $('lightbox-img').src = item.url;
+    $('lightbox-img').alt = 'Image ' + item.label;
+    $('lightbox-count').textContent = (lb.index + 1) + ' of ' + list.length;
+    $('lightbox-prev').disabled = list.length < 2;
+    $('lightbox-next').disabled = list.length < 2;
+  }
+
+  function openLightbox(items, index, opener) {
+    lb.items = items;
+    lb.opener = opener || null;
+    var clicked = items[index];
+    lb.index = Math.max(0, shownItems().indexOf(clicked));
+    $('lightbox-stage').className = 'lightbox-stage';
+    $('lightbox-zoom').textContent = 'Actual size';
+    $('lightbox').hidden = false;
+    renderLightbox();
+    $('lightbox-close').focus();
+  }
+
+  function closeLightbox() {
+    $('lightbox').hidden = true;
+    $('lightbox-img').removeAttribute('src');
+    if (lb.opener && document.body.contains(lb.opener)) { lb.opener.focus(); }
+    lb = { items: [], index: 0, opener: null };
+  }
+
+  function stepLightbox(by) {
+    var n = shownItems().length;
+    if (n < 2) { return; }
+    lb.index = (lb.index + by + n) % n;
+    renderLightbox();
+  }
+
+  function toggleZoom() {
+    var stage = $('lightbox-stage');
+    var actual = stage.className.indexOf('actual') >= 0;
+    stage.className = actual ? 'lightbox-stage' : 'lightbox-stage actual';
+    $('lightbox-zoom').textContent = actual ? 'Actual size' : 'Fit to screen';
+  }
 
   // ---------------------------------------------------------------- tabs
 
   var VIEWS = ['received', 'send', 'sent'];
 
   function showView(name) {
-    VIEWS.forEach(function (v) {
+    $('lightbox-close').addEventListener('click', closeLightbox);
+  $('lightbox-prev').addEventListener('click', function () { stepLightbox(-1); });
+  $('lightbox-next').addEventListener('click', function () { stepLightbox(1); });
+  $('lightbox-zoom').addEventListener('click', toggleZoom);
+  $('lightbox').addEventListener('click', function (ev) { if (ev.target === $('lightbox')) { closeLightbox(); } });
+  document.addEventListener('keydown', function (ev) {
+    if (!lightboxOpen()) { return; }
+    if (ev.key === 'Escape') { closeLightbox(); }
+    else if (ev.key === 'ArrowLeft') { stepLightbox(-1); }
+    else if (ev.key === 'ArrowRight') { stepLightbox(1); }
+  });
+  VIEWS.forEach(function (v) {
       $('view-' + v).hidden = v !== name;
       $('tab-' + v).setAttribute('aria-pressed', v === name ? 'true' : 'false');
     });
@@ -297,9 +378,26 @@
     }).catch(function (e) { sendSay(e.message, true); });
   }
 
+  function renderPreview(uc, p) {
+    releaseBlobs('send');
+    var host = $('send-preview');
+    clear(host);
+    if (!p.seeded) { host.appendChild(el('p', 'Load the data to see the images.', 'empty')); return; }
+    var thumbs = el('div', null, 'thumbs');
+    host.appendChild(thumbs);
+    addThumbs(thumbs, 'send', p.payloads.map(function (x) {
+      return {
+        path: '/ode/package/images/' + encodeURIComponent(uc) + '/' + encodeURIComponent(x.entryId),
+        label: x.entryId,
+        meta: x.contentType + ', ' + x.size + ' bytes, sha-256 ' + x.sha256
+      };
+    }));
+  }
+
   function refreshSeedStatus() {
     var uc = chosenUseCase();
     return api('/ode/package?useCase=' + encodeURIComponent(uc)).then(function (r) { return r.json(); }).then(function (p) {
+      renderPreview(uc, p);
       $('seed-status').textContent = p.seeded
         ? useCaseLabel(uc) + ' data is loaded (' + p.resources + ' resources, ' + p.payloads.length + ' image(s), data version ' + String(p.ref).slice(0, 7) + ').'
         : useCaseLabel(uc) + ' data is not loaded yet. Click "Load the data" first.';
@@ -361,6 +459,26 @@
 
   // ---------------------------------------------------------------- sent log
 
+  function showSentImages(s) {
+    releaseBlobs('sent');
+    var host = $('sent-detail');
+    clear(host);
+    $('sent-detail-card').hidden = false;
+    host.appendChild(el('p', useCaseLabel(s.useCase) + ' referral ' + (s.referralId || '') + ' sent to ' + s.clientId, 'note'));
+    api('/ode/manifests/' + encodeURIComponent(s.manifestId)).then(function (r) { return r.json(); }).then(function (m) {
+      if (!m.entries.length) { host.appendChild(el('p', 'This referral carried no images.', 'empty')); return; }
+      var thumbs = el('div', null, 'thumbs');
+      host.appendChild(thumbs);
+      addThumbs(thumbs, 'sent', m.entries.map(function (e) {
+        return {
+          path: '/ode/sends/' + encodeURIComponent(s.sendId) + '/images/' + encodeURIComponent(e.entryId),
+          label: e.entryId,
+          meta: e.contentType + ', ' + e.size + ' bytes, sha-256 ' + e.sha256
+        };
+      }));
+    }).catch(function (e) { host.appendChild(el('p', e.message, 'message error')); });
+  }
+
   function loadSent() {
     return api('/ode/sends?limit=50').then(function (r) { return r.json(); }).then(function (rows) {
       var host = $('sent-list');
@@ -368,7 +486,7 @@
       if (!rows.length) { host.appendChild(el('p', 'Nothing sent yet.', 'empty')); return; }
       var table = el('table');
       var head = el('tr');
-      ['Sent', 'Use case', 'Tester', 'Sent to', 'Outcome', 'Their answer', 'Referral'].forEach(function (h) { head.appendChild(el('th', h)); });
+      ['Sent', 'Use case', 'Tester', 'Sent to', 'Outcome', 'Their answer', 'Referral', ''].forEach(function (h) { head.appendChild(el('th', h)); });
       table.appendChild(head);
       rows.forEach(function (s) {
         var row = el('tr');
@@ -381,6 +499,12 @@
         row.appendChild(o);
         row.appendChild(el('td', s.targetStatus > 0 ? s.targetStatus : '-'));
         row.appendChild(el('td', s.referralId || '(none)', 'mono'));
+        var cell = el('td');
+        var open = el('button', 'Images', 'link');
+        open.type = 'button';
+        open.addEventListener('click', function () { showSentImages(s); });
+        cell.appendChild(open);
+        row.appendChild(cell);
         table.appendChild(row);
       });
       host.appendChild(table);
@@ -402,11 +526,15 @@
     token = '';
     storeToken('');
     $('token').value = '';
-    releaseBlobs();
     clear($('list'));
     clear($('detail'));
     $('detail-card').hidden = true;
     clear($('sent-list'));
+    clear($('sent-detail'));
+    $('sent-detail-card').hidden = true;
+    clear($('send-preview'));
+    ['received', 'send', 'sent'].forEach(releaseBlobs);
+    if (lightboxOpen()) { closeLightbox(); }
     clear($('send-result'));
     clear($('send-client'));
     clients = [];

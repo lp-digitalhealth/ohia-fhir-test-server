@@ -1,0 +1,441 @@
+{
+  "resourceType": "CapabilityStatement",
+  "name": "OhiaTestServerCapability",
+  "title": "OHIA FHIR test server (November testing): target capability",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-11-05",
+  "publisher": "OHIA test server (Leavitt Partners)",
+  "description": "A test server. It states the capability it is working toward, not a certified one. See rest.documentation for what is implemented today.",
+  "kind": "instance",
+  "software": {
+    "name": "HAPI FHIR JPA server with the OHIA facade"
+  },
+  "implementation": {
+    "description": "OHIA FHIR test server",
+    "url": "{{BASE}}/fhir"
+  },
+  "fhirVersion": "4.0.1",
+  "format": [
+    "application/fhir+json",
+    "json"
+  ],
+  "rest": [
+    {
+      "mode": "server",
+      "documentation": "TEST SERVER. This statement declares the capability the server is going for in the OHIA November testing, and it will change as the payloads do. IMPLEMENTED TODAY: FHIR R4 (4.0.1) read, create, update and search on the types below, and a transaction at the base; one shared bearer token for everything except this statement; receiving a UC04a or UC07 referral and pulling its images with ARex at POST {{BASE}}/ode/receive/{uc04a|uc07}; sending a UC04a or UC07 referral to a registered tester; an ARex content server at {{BASE}}/arex (discovery {{BASE}}/arex/.well-known/smart-configuration, our client key {{BASE}}/arex/jwks.json). TARGET, NOT IMPLEMENTED YET: SMART Backend Services at the FHIR base (signed key assertions); ODE profile validation and validation feedback; ARex manifest signature verification; a transaction posted to the FHIR base itself starting the ARex image pull (today only the receive endpoint does that).",
+      "security": {
+        "description": "Interim: send Authorization: Bearer <shared token> on every request except GET {{BASE}}/fhir/metadata. Target: SMART Backend Services (client_credentials with a signed private_key_jwt assertion, RS384 or ES384). No OAuth token address is declared for the FHIR base because none is implemented here; the ARex token endpoint at {{BASE}}/arex/auth/token does not accept FHIR calls."
+      },
+      "resource": [
+        {
+          "type": "Communication",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ]
+        },
+        {
+          "type": "Condition",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ]
+        },
+        {
+          "type": "Coverage",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ]
+        },
+        {
+          "type": "DiagnosticReport",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ]
+        },
+        {
+          "type": "DocumentReference",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ],
+          "supportedProfile": [
+            "http://fhir.onyxhealth.io/us/arex/StructureDefinition/arex-content-entry"
+          ]
+        },
+        {
+          "type": "Encounter",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ]
+        },
+        {
+          "type": "Endpoint",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ]
+        },
+        {
+          "type": "ImagingStudy",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ]
+        },
+        {
+          "type": "InsurancePlan",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ]
+        },
+        {
+          "type": "List",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ],
+          "supportedProfile": [
+            "http://fhir.onyxhealth.io/us/arex/StructureDefinition/arex-manifest"
+          ]
+        },
+        {
+          "type": "Location",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ]
+        },
+        {
+          "type": "MedicationStatement",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ]
+        },
+        {
+          "type": "Observation",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ]
+        },
+        {
+          "type": "Organization",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ]
+        },
+        {
+          "type": "Patient",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ]
+        },
+        {
+          "type": "Practitioner",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ]
+        },
+        {
+          "type": "PractitionerRole",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ]
+        },
+        {
+          "type": "Procedure",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ]
+        },
+        {
+          "type": "Provenance",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ],
+          "supportedProfile": [
+            "http://fhir.onyxhealth.io/us/arex/StructureDefinition/arex-provenance"
+          ]
+        },
+        {
+          "type": "RelatedPerson",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ]
+        },
+        {
+          "type": "ServiceRequest",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ]
+        },
+        {
+          "type": "Subscription",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ],
+          "documentation": "HAPI 8.12 refuses a Subscription that lacks the backport-filter-criteria extension (HAPI-0011)."
+        },
+        {
+          "type": "Task",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "create"
+            },
+            {
+              "code": "update"
+            },
+            {
+              "code": "search-type"
+            }
+          ]
+        }
+      ],
+      "interaction": [
+        {
+          "code": "transaction",
+          "documentation": "A transaction Bundle of PUT entries is accepted and stored. Only POST {{BASE}}/ode/receive/{uc04a|uc07} also pulls the ARex images."
+        }
+      ]
+    }
+  ]
+}

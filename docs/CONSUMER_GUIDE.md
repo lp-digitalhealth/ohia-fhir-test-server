@@ -24,7 +24,7 @@ Authorization: Bearer <your-token>
 - Use **HTTPS** only.
 - A missing or wrong token gets `401 Unauthorized`.
 
-`GET <base-url>/metadata` needs **no** token. Use it to check the server is up and to read its capabilities.
+`GET <base-url>/metadata` needs **no** token. Use it to check the server is up and to read its capabilities. It is a draft statement of the capability this TEST server is going for; its `rest.documentation` says which parts are implemented today and which are only the target.
 
 ## Try it
 

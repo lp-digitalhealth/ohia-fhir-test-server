@@ -56,6 +56,14 @@ public class ManifestAdminController {
         s.put("expiresAt", m.expiresAt());
         s.put("retracted", m.retracted());
         s.put("contentObjects", m.entries().size());
+        s.put("entries", m.entries().stream().map(e -> {
+            Map<String, Object> o = new LinkedHashMap<>();
+            o.put("entryId", e.originalEntryId());
+            o.put("contentType", e.contentType());
+            o.put("size", e.size());
+            o.put("sha256", e.sha256());
+            return o;
+        }).toList());
         return s;
     }
 }
