@@ -1,0 +1,35 @@
+{
+  "resourceType": "ValueSet",
+  "id": "ohia-requested-service-type-cdt",
+  "url": "http://ohia-codes.org/ValueSet/ohia-requested-service-type-cdt",
+  "version": "0.1.0",
+  "name": "OHIARequestedServiceTypeCDT",
+  "title": "OHIA Requested Service Type (PAS service types plus CDT)",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-11-05",
+  "publisher": "Oral Health Interoperability Alliance (OHIA)",
+  "description": "Every code in the Da Vinci PAS 2.2.1 X12 278 Requested Service Type value set, PLUS the ADA CDT code system (http://www.ada.org/cdt), so that an oral prior authorization can carry its CDT procedure code. The CDT codes are ADA-licensed and are NOT enumerated here: the whole code system is included by reference.",
+  "jurisdiction": [
+    {
+      "coding": [
+        {
+          "system": "urn:iso:std:iso:3166",
+          "code": "US"
+        }
+      ]
+    }
+  ],
+  "compose": {
+    "include": [
+      {
+        "valueSet": [
+          "http://hl7.org/fhir/us/davinci-pas/ValueSet/X12278RequestedServiceType|2.2.1"
+        ]
+      },
+      {
+        "system": "http://www.ada.org/cdt"
+      }
+    ]
+  }
+}
