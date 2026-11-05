@@ -1,6 +1,7 @@
 package org.ohia.facade.arexclient;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -87,10 +88,22 @@ class ArexClientRefusalsTest {
         assertTrue(saved.isEmpty());
     }
 
+    /** A name that does not exist is not "unsafe": it gets its own finding, and still nothing is contacted. */
+    @Test
+    void aHostNameThatDoesNotResolveIsReportedAsNotFoundNotAsUnsafe() {
+        List<ArexClient.ContentRef> refs = List.of(new ArexClient.ContentRef("arex-entry-photo-1",
+                "https://no-such-host.invalid/arex/Binary/arex-entry-photo-1", "image/jpeg", 632, "00"));
+        ArexClient.Outcome o = pull(client(false), refs);
+        assertNotNull(o.stoppedBecause());
+        assertTrue(codes(o).contains("HOST_NOT_FOUND"), codes(o).toString());
+        assertFalse(codes(o).contains("UNSAFE_URL_REFUSED"), "an unknown name is not an unsafe address: " + codes(o));
+        assertTrue(saved.isEmpty());
+    }
+
     @Test
     void privateAndMetadataAddressesAreRefusedWithoutAnyConnection() {
         for (String host : new String[] {"https://localhost", "https://127.0.0.1", "https://10.0.0.5", "https://172.17.0.2",
-                "https://192.168.1.10", "https://169.254.169.254", "https://[::1]", "https://hapi:8080"}) {
+                "https://192.168.1.10", "https://169.254.169.254", "https://[::1]"}) {
             List<ArexClient.ContentRef> refs = List.of(new ArexClient.ContentRef("arex-entry-photo-1",
                     host + "/arex/Binary/arex-entry-photo-1", "image/jpeg", 632, "00"));
             ArexClient.Outcome o = pull(client(false), refs);

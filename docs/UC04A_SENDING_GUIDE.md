@@ -71,6 +71,7 @@ Each finding has a code, a spec reference where one exists, and a sentence. The 
 | `NO_AREX_MANIFEST` | No manifest with entries; stored, nothing to pull. |
 | `ENTRY_INCOMPLETE`, `ENTRY_ID_SANITIZED` | An entry lacks an id, url or SHA-256 (not pulled), or its id was not a safe file name. |
 | `SUBSCRIPTION_NOT_STORED` | HAPI refused the Subscription; the rest was stored (plan item O9). |
+| `HOST_NOT_FOUND` | The host name in your content URLs does not resolve (for example the sample's `meridian-teledental.example.org`). Nothing was contacted. |
 | `UNSAFE_URL_REFUSED` | A URL was not https, not public, not on your base's origin, or not under your base. |
 | `TOKEN_ENDPOINT_NOT_DISCOVERED`, `AUTHORIZATION_DETAILS_TYPE_ADJUSTED` | A discovery or token-request assumption did not hold. |
 | `TOKEN_REFUSED` | You refused our token. The pull stops. |

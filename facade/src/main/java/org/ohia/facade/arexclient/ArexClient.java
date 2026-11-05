@@ -260,7 +260,7 @@ public class ArexClient {
             }
             return null;
         } catch (ForbiddenTargetException e) {
-            run.finding("UNSAFE_URL_REFUSED", "local safety rule", ref.entryId() + ": " + e.getMessage());
+            run.finding(refusalCode(e), "local safety rule", ref.entryId() + ": " + e.getMessage());
             return new ObjectResult(ref.entryId(), ref.url(), "refused", 0, null, null);
         }
     }
@@ -302,8 +302,13 @@ public class ArexClient {
         try {
             return guard.validate(url);
         } catch (ForbiddenTargetException e) {
-            throw run.stop("UNSAFE_URL_REFUSED", "local safety rule", "Refused " + what + " (" + url + "): " + e.getMessage());
+            throw run.stop(refusalCode(e), "local safety rule", "Refused " + what + " (" + url + "): " + e.getMessage());
         }
+    }
+
+    /** A name that does not exist is reported as such; everything else the guard refuses is "unsafe". */
+    private static String refusalCode(ForbiddenTargetException e) {
+        return e instanceof org.ohia.facade.common.UnresolvableTargetException ? "HOST_NOT_FOUND" : "UNSAFE_URL_REFUSED";
     }
 
     private void checkSameOrigin(Run run, URI base, URI other, String what) {

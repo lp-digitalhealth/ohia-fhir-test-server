@@ -135,7 +135,10 @@
     fact(dl, 'Received', shortTime(r.receivedAt));
     fact(dl, 'Referral id', r.referralId);
     fact(dl, 'Manifest id', r.manifestId);
-    fact(dl, 'Payload stored', r.accepted ? 'yes, exactly as received (' + r.hapiEntries + ' entries)' : 'no');
+    var dropped = r.findings.some(function (f) { return f.code === 'SUBSCRIPTION_NOT_STORED'; });
+    fact(dl, 'Payload stored', !r.accepted ? 'no' : (dropped
+      ? 'yes, but without its Subscription (' + r.hapiEntries + ' entries; see the findings)'
+      : 'yes, exactly as received (' + r.hapiEntries + ' entries)'));
     fact(dl, 'Sender (ARex base)', r.sender);
     fact(dl, 'Token endpoint', r.tokenEndpoint);
     fact(dl, 'authorization_details type', r.authorizationDetailsType);
