@@ -43,6 +43,10 @@ services:
       HAPI_FHIR_LOCAL_BASE_URLS_0: ${PUBLIC_BASE_URL:-http://localhost:8080}/ode/receive/uc04a
       HAPI_FHIR_LOCAL_BASE_URLS_1: ${PUBLIC_BASE_URL:-http://localhost:8080}/ode/receive/uc07
       HAPI_FHIR_LOCAL_BASE_URLS_2: ${PUBLIC_BASE_URL:-http://localhost:8080}/fhir
+      # An ARex manifest points at each image's DocumentReference by its full address on the SENDER's own server, and
+      # that resource may not be in the Bundle at all. So references to other servers are accepted and kept as given
+      # (the target is not fetched and not checked). Seen on the live server as HAPI-0507 (2026-11-05).
+      HAPI_FHIR_ALLOW_EXTERNAL_REFERENCES: "true"
     # No published ports: reachable only through Caddy.
 
   # Java facade: UC07 ODE referral sender and ARex content server. Built from ../facade.
