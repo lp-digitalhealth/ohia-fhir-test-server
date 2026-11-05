@@ -19,6 +19,13 @@ This document is for coding assistants to put the current state of the repo
 - **Operations:** the token lives only in the VM's `deploy/.env` (never in git) and with the owner. To roll out or rotate it, edit `API_TOKEN` in `.env` and run `docker compose up -d` (see `deploy/README.md` section 7).
 - **Revisit in January 2027:** replace the shared token with the real design (SMART backend services and standalone launch, F9 and M1). O1 is resolved (S3), so the facade exists and could take this over.
 
+## UC04a receiver and viewer (S6, S7; `facade/`, uncommitted until pushed)
+- **In the repo:** `POST /ode/receive/uc04a` receives a UC04a interaction 1 payload, stores it in HAPI and pulls the ARex image manifest from the sender; `/viewer/` shows the result; `/arex/jwks.json` and `/ode/identity` publish our key. Guide: `docs/UC04A_SENDING_GUIDE.md`.
+- **VERIFIED in the sandbox:** 161 automated tests; end-to-end against real HAPI 8.12.0 with the real UC04a data and an independent Python sender (21 checks, 21 passed, for the authored, no-Subscription and filtered-Subscription variants); a Chromium check of the viewer (18 passed), including a hostile receipt that ran no script.
+- **FOUND:** real HAPI refuses the UC04a Subscription (HAPI-0011). The facade now stores the other 29 entries and reports `SUBSCRIPTION_NOT_STORED`. **Owner decision open:** fix the data or keep this tolerance (O9).
+- **NOT IMPLEMENTED:** manifest signature verification (draft gaps), download resume.
+- **UNVERIFIED:** the live VM and Caddy for `/viewer/` and `/arex/jwks.json`; any real tester's ARex server; the discovery path and `authorization_details` type are assumptions; ARex wording (arex-8, 22, 39, 43, 48, 59) was read through a summarizer.
+
 ## Facade: UC07 sender and ARex content server (S3, S4, S5; `facade/`)
 - **In the repo (branch `November_Testing_Server_Setup`):** a Java 21 / Spring Boot service beside HAPI. Caddy routes only `/ode/*` and `/arex/*` to it; `/fhir` is unchanged. See `facade/README.md` and `deploy/README.md` section 8.
 - **VERIFIED in the sandbox:** 94 automated tests pass (token lock, seed, read-back, per-send copy, send, SSRF refusals, registry, ARex tokens and content). Three security rules were mutation-checked (a deliberate break of manifest expiry, replay protection and manifest scoping each makes a test fail).

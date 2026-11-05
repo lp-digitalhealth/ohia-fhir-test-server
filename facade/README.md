@@ -61,6 +61,10 @@ mvn package       # builds target/ohia-facade-0.1.0.jar
 
 Docker (as the compose file does it): `docker compose build facade`.
 
+## UC04a receiver and viewer (S6, S7)
+
+`POST /ode/receive/uc04a` stores a UC04a interaction 1 Bundle in HAPI and pulls the manifest's images from the sender with ARex, then answers with a receipt. `GET /ode/receipts`, `/ode/receipts/{id}` and `/ode/receipts/{id}/images/{fileKey}` read results; `GET /ode/identity` and the open `GET /arex/jwks.json` publish our client id and public key; `/viewer/` is a static page that shows receipts and images. Report-first: gaps are named findings, a retracted manifest or refused token stops the pull. Not implemented: manifest signature verification, download resume. Full detail: `docs/UC04A_SENDING_GUIDE.md`. Settings: `facade.client.*` in `application.yml`. Independent checks: `e2e/run_uc04a_e2e.py`, `e2e/viewer_check.js`.
+
 ## Known limits
 
 - Data stores are plain files on the `facade_data` volume; access tokens and replay records are in memory, so a restart ends outstanding tokens.

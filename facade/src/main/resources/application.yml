@@ -21,3 +21,16 @@ facade:
     allow-http: false
     allow-private-targets: false
     manifest-ttl-days: ${FACADE_MANIFEST_TTL_DAYS:30}
+  client:
+    # How this server behaves when it PULLS from a sender's ARex server (UC04a receive).
+    id: ${FACADE_CLIENT_ID:ohia-test-server}
+    # Our own key pair. Created on first use if the file is missing; mount a file here to supply your own.
+    key-file: ${FACADE_CLIENT_KEY_FILE:${facade.data-dir}/keys/server-key.json}
+    requesting-organization: ${FACADE_CLIENT_ORG:Organization/org-barton-springs-dental}
+    # The draft ARex spec names no authorization_details type; this is our own default.
+    authorization-details-type: ${FACADE_CLIENT_AD_TYPE:arex-manifest}
+    max-objects: 20
+    max-object-bytes: 10000000
+    max-total-bytes: 50000000
+    connect-timeout-seconds: 5
+    read-timeout-seconds: 60

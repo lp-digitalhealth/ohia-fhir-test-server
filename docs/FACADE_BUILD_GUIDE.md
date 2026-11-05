@@ -311,3 +311,19 @@ That is a separate guide: `docs/AREX_RETRIEVAL_GUIDE.md` (with a tested script, 
 - ARex conformance beyond the statements listed in 1.2, and the exact spec wording (see 1.2).
 - ODE profile conformance (the profiles are unbuilt).
 - DNS rebinding, load, and browser CORS behavior.
+
+---
+
+## 8. Extension: receiving UC04a and pulling its images (the facade as an ARex client)
+
+This extends the build so the server also plays the **receiver**. Decisions are plan items S6 and S7; the tester-facing guide is `docs/UC04A_SENDING_GUIDE.md`. Build it in this order, testing each step before the next:
+
+1. **Identity (`keys/`).** `ServerKeyStore` creates an RSA 2048 key on first use (kid `ohia-server-1`, written atomically, owner-only) and refuses a bad key file rather than replacing it. `ClientAssertionSigner` signs RS384 assertions. Publish the public half at `GET /arex/jwks.json`. Test: sign with the signer, verify with the facade's own verifier.
+2. **The client (`arexclient/`).** `ArexClient.pull` does discovery, token, published-manifest check, then downloads. Treat every URL from the payload as hostile: SSRF guard, same origin as the sender's ARex base, no redirects, size caps, save only digest-verified bytes. Build a stand-in sender first with a switch for each failure (tampered bytes, retracted manifest, refused token, expired token).
+3. **Receiving (`receive/`, `web/ReceiveController`).** Validate, store the Bundle in HAPI exactly as received, pull, write a receipt (`receipt.json` plus images) atomically. A gap the spec leaves open is a **finding**, not a refusal.
+4. **Viewer (`static/viewer/`, `ViewerSecurityFilter`).** A static page; `textContent` only; strict CSP; images from `blob:` URLs and only if the bytes sniff as JPEG or PNG. Add an open Caddy route for `/viewer/*` **before** the token handler.
+5. **Verify independently.** `facade/e2e/run_uc04a_e2e.py` uses a Python sender that verifies our assertion with PyJWT and the key it fetches from our JWKS; `facade/e2e/viewer_check.js` drives real Chromium, including a hostile receipt.
+
+Lessons from this build, worth repeating: (a) real HAPI refused the authored Subscription (HAPI-0011), which no stand-in HAPI would have shown; (b) a stale pooled connection made 1 in 8 end-to-end runs fail on the second token request, found only by running the real flow repeatedly (fixed with one retry using a fresh assertion; 20 of 20 runs then passed); (c) a browser check that picked its row by text opened the wrong receipt, so it now picks by API data.
+
+**Verified (sandbox, 2026-11-05):** 161 tests; the end-to-end run (21 checks, three payload variants); the viewer check (18 checks). **Not verified:** the live VM, `/viewer/` and `/arex/jwks.json` through the live Caddy, any real tester's ARex server. **Not implemented:** manifest signature verification, download resume.

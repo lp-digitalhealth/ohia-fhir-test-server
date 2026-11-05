@@ -29,7 +29,8 @@ class ClientRegistryTest {
 
     private ClientRegistry registry(boolean allowHttp) {
         return new ClientRegistry(new FacadeProperties("h", "p", "t", "/d", file.toString(),
-                new FacadeProperties.Seed("u", "r", "p"), new FacadeProperties.Send(allowHttp, false, 30)),
+                new FacadeProperties.Seed("u", "r", "p"), new FacadeProperties.Send(allowHttp, false, 30),
+                new FacadeProperties.Client("ohia-test-server", "/data/keys/server-key.json", "Organization/org-barton-springs-dental", "arex-manifest", 20, 10_000_000L, 50_000_000L, 5, 60)),
                 new ObjectMapper());
     }
 

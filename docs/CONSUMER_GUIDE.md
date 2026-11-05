@@ -130,3 +130,5 @@ The content URLs in the manifest need a token; anonymous access is never allowed
 - **If something looks wrong:** report the time, the request (without the token), the status code and the response body to the organizer.
 
 Organizer contact: `<add contact here>`
+
+**Playing the platform in UC04a?** The server also receives UC04a interaction 1 and pulls your image manifest. See `docs/UC04A_SENDING_GUIDE.md`.

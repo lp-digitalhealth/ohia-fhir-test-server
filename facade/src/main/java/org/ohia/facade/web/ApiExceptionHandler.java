@@ -6,6 +6,7 @@ import org.ohia.facade.arex.OAuthException;
 import org.ohia.facade.common.BadDataException;
 import org.ohia.facade.common.ForbiddenTargetException;
 import org.ohia.facade.common.NotSeededException;
+import org.ohia.facade.common.PayloadTooLargeException;
 import org.ohia.facade.common.UpstreamException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +27,11 @@ public class ApiExceptionHandler {
         m.put("error", e.error());
         m.put("error_description", e.getMessage());
         return ResponseEntity.status(e.httpStatus()).header("Cache-Control", "no-store").header("Pragma", "no-cache").body(m);
+    }
+
+    @ExceptionHandler(PayloadTooLargeException.class)
+    ResponseEntity<Map<String, Object>> tooLarge(PayloadTooLargeException e) {
+        return body(HttpStatus.PAYLOAD_TOO_LARGE, e.getMessage(), null);
     }
 
     @ExceptionHandler(ForbiddenTargetException.class)
