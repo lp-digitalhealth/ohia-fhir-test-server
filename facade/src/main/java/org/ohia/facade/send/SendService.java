@@ -12,12 +12,13 @@ import org.ohia.facade.clients.ClientEntry;
 import org.ohia.facade.clients.ClientRegistry;
 import org.ohia.facade.common.BadDataException;
 import org.ohia.facade.common.ForbiddenTargetException;
+import org.ohia.facade.common.UseCase;
 import org.ohia.facade.config.FacadeProperties;
 import org.ohia.facade.seed.PackageReader;
 import org.springframework.stereotype.Service;
 
 /**
- * Sends the UC07 referral (interaction 1) to a registered tester, as one transaction Bundle POSTed
+ * Sends a referral (UC07 or UC04a interaction 1; UC07 when none is named) to a registered tester, as one transaction Bundle POSTed
  * to their FHIR base URL.
  *
  * <p>Order matters. Everything that can refuse the request (unknown tester, target outside that
@@ -29,7 +30,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class SendService {
 
-    public record SendRequest(String clientId, String targetBaseUrl, String targetBearerToken) {
+    public record SendRequest(String clientId, String targetBaseUrl, String targetBearerToken, String useCase) {
+        public SendRequest(String clientId, String targetBaseUrl, String targetBearerToken) {
+            this(clientId, targetBaseUrl, targetBearerToken, null);
+        }
     }
 
     private final ClientRegistry registry;
@@ -69,17 +73,18 @@ public class SendService {
             throw new ForbiddenTargetException("The target URL is not in this client's allowed target prefixes.");
         }
         URI uri = guard.validate(target);
+        UseCase useCase = UseCase.parseOrDefault(req.useCase());
 
-        ObjectNode packageBundle = reader.readBundle();
+        ObjectNode packageBundle = reader.readBundle(useCase);
 
         String sendId = UUID.randomUUID().toString();
         String sendShort = sendId.substring(0, 8);
         Instant now = clock.instant();
         Instant expires = now.plus(ttlDays, ChronoUnit.DAYS);
         PerSendCopier.Copy copy = PerSendCopier.copy(packageBundle, sendShort, publicBaseUrl,
-                client.requestingOrganization(), expires, () -> UUID.randomUUID().toString());
+                client.organizationFor(useCase), expires, () -> UUID.randomUUID().toString());
 
-        manifests.save(new ManifestRecord(copy.manifestId(), sendId, client.clientId(), client.requestingOrganization(),
+        manifests.save(new ManifestRecord(copy.manifestId(), sendId, client.clientId(), client.organizationFor(useCase),
                 now, expires, false, copy.referralId(), copy.manifest(), copy.entries()));
 
         String json;
@@ -93,7 +98,7 @@ public class SendService {
         String outcome = d.status() >= 200 && d.status() < 300 ? "delivered"
                 : d.status() < 0 ? "unreachable" : "rejected-by-target";
         SendRecord record = new SendRecord(sendId, now, client.clientId(), target, copy.referralId(), copy.manifestId(),
-                expires, outcome, d.status(), d.excerpt(), d.millis(), d.error());
+                expires, outcome, d.status(), d.excerpt(), d.millis(), d.error(), useCase.id());
         log.append(record);
         return record;
     }

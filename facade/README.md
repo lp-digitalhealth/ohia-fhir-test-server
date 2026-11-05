@@ -65,6 +65,13 @@ Docker (as the compose file does it): `docker compose build facade`.
 
 `POST /ode/receive/uc04a` stores a UC04a interaction 1 Bundle in HAPI and pulls the manifest's images from the sender with ARex, then answers with a receipt. `GET /ode/receipts`, `/ode/receipts/{id}` and `/ode/receipts/{id}/images/{fileKey}` read results; `GET /ode/identity` and the open `GET /arex/jwks.json` publish our client id and public key; `/viewer/` is a static page that shows receipts and images. Report-first: gaps are named findings, a retracted manifest or refused token stops the pull. Not implemented: manifest signature verification, download resume. Full detail: `docs/UC04A_SENDING_GUIDE.md`. Settings: `facade.client.*` in `application.yml`. Independent checks: `e2e/run_uc04a_e2e.py`, `e2e/viewer_check.js`.
 
+## Sending UC04a, receiving UC07, and the page (S8 to S10)
+
+- **Send UC04a interaction 1:** `POST /ode/admin/seed?useCase=uc04a` once, then `POST /ode/send` with `"useCase":"uc04a"` (UC07 is the default when none is named). Our ARex server hosts the two photos. A tester that plays a different organization for UC04a needs `organizationsByUseCase` in `config/clients.json` (see `clients.example.json`); without it the send is refused with a plain message.
+- **Receive UC07:** `POST /ode/receive/uc07`. `GET /ode/receipts?useCase=uc07` filters. `GET /ode/clients` lists the registered testers for the send form (never their keys).
+- **The page (`/viewer/`):** tabs for Received (with a use-case filter), Send a referral and Sent.
+- **Known limit:** received payloads and the data we send from share one HAPI. A tester who sends us the sample referral under the same resource ids overwrites our copy of it. Use "Load the data" (or `POST /ode/admin/seed?useCase=...`) before sending to restore it.
+
 ## Known limits
 
 - Data stores are plain files on the `facade_data` volume; access tokens and replay records are in memory, so a restart ends outstanding tokens.

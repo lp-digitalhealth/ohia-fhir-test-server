@@ -115,3 +115,15 @@ The facade also receives UC04a interaction 1 and pulls its images with ARex (pla
 - **See results:** open `$BASE/viewer/` and type the shared token, or `curl -s -H "Authorization: Bearer $TOKEN" $BASE/ode/receipts`.
 - **Tested in the sandbox:** 161 automated tests; an end-to-end run against real HAPI 8.12.0 with the real UC04a data and an independent Python sender (21 checks, all three payload variants); a Chromium check of the viewer (18 checks).
 - **Observed on the live VM (2026-11-05):** the facade built and was healthy; after recreating Caddy, `/viewer/` and `/arex/jwks.json` returned 200 and `/ode/identity` without a token returned 401. **Not tested:** a UC04a payload received on the live server, and any real tester's ARex server.
+
+## 10. Sending UC04a and receiving UC07 from the page
+
+Plan items S8 to S10. After the usual update (`git pull`, `docker compose build facade`, `docker compose up -d`; recreate Caddy only if the Caddyfile changed, see section 9):
+
+1. Register each tester for UC04a: in `facade/config/clients.json` add `"organizationsByUseCase": {"uc04a": "Organization/org-barton-springs-dental"}` to the tester's entry (see `facade/config/clients.example.json`). No restart is needed.
+2. Open `/viewer/`, enter the token, go to **Send a referral**, choose UC04a, click **Load the data** once, pick the tester, check the address, click **Send referral** and confirm.
+3. Testers send you a UC07 referral with `POST /ode/receive/uc07` (same token as UC04a). It appears on the **Received** tab; filter by use case.
+
+- **Tested in the sandbox:** 175 automated tests; end-to-end against real HAPI 8.12.0 for UC04a receive (21 checks) and UC07 receive (8 checks) with an independent Python sender; a Chromium check of the new tabs (18 checks), including sending to a stand-in tester.
+- **Not tested:** the live VM with these changes, and any real tester receiving a UC04a referral or pulling its photos from this server.
+

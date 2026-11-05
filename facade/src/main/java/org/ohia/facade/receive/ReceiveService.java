@@ -17,12 +17,14 @@ import org.ohia.facade.arexclient.ArexClient;
 import org.ohia.facade.arexclient.ManifestFacts;
 import org.ohia.facade.common.BadDataException;
 import org.ohia.facade.common.UpstreamException;
+import org.ohia.facade.common.UseCase;
 import org.ohia.facade.config.FacadeProperties;
+import org.ohia.facade.config.UseCaseProperties;
 import org.ohia.facade.hapi.HapiClient;
 import org.springframework.stereotype.Service;
 
 /**
- * Receives a UC04a payload (a FHIR transaction Bundle that carries an ARex manifest), stores it,
+ * Receives a UC04a or UC07 referral (a FHIR transaction Bundle that carries an ARex manifest), stores it,
  * pulls the images with ARex, and records everything as a {@link Receipt}.
  *
  * <p>Order: every refusal comes before anything is written. The payload is stored in HAPI exactly
@@ -43,19 +45,30 @@ public class ReceiveService {
     private final ReceiptStore store;
     private final ObjectMapper mapper;
     private final Clock clock;
-    private final String ourOrganization;
+    private final String uc04aOrganization;
+    private final String uc07Organization;
 
     public ReceiveService(HapiClient hapi, ArexClient arex, ReceiptStore store, ObjectMapper mapper, Clock clock,
-            FacadeProperties props) {
+            FacadeProperties props, UseCaseProperties useCases) {
         this.hapi = hapi;
         this.arex = arex;
         this.store = store;
         this.mapper = mapper;
         this.clock = clock;
-        this.ourOrganization = props.client().requestingOrganization();
+        this.uc04aOrganization = props.client().requestingOrganization();
+        this.uc07Organization = useCases.receiving().uc07RequestingOrganization();
     }
 
     public Receipt receive(String body) {
+        return receive(UseCase.UC04A, body);
+    }
+
+    /** The organization we play when this use case's referral is sent to us (and so the one we retrieve as). */
+    private String ourOrganization(UseCase useCase) {
+        return useCase == UseCase.UC07 ? uc07Organization : uc04aOrganization;
+    }
+
+    public Receipt receive(UseCase useCase, String body) {
         JsonNode bundle = parseBundle(body);
         List<JsonNode> resources = new ArrayList<>();
         for (JsonNode e : bundle.get("entry")) {
@@ -71,7 +84,7 @@ public class ReceiveService {
         if (manifest == null || contentEntries.isEmpty()) {
             findings.add(new ArexClient.Finding("NO_AREX_MANIFEST", "F29", "The payload carries no ARex manifest with content entries; nothing to pull."));
         } else {
-            inspectEmbedded(manifest, resources, findings);
+            inspectEmbedded(manifest, resources, findings, ourOrganization(useCase));
         }
 
         // Store exactly what was received. A HAPI refusal throws (502) and nothing else happens, except
@@ -88,7 +101,7 @@ public class ReceiveService {
         Receipt receipt = new Receipt(receiptId, clock.instant(), referralId, manifest == null ? null : manifest.path("id").asText(null),
                 true, stored, outcome == null ? null : outcome.arexBase(), outcome == null ? null : outcome.tokenEndpoint(),
                 outcome == null ? null : outcome.authorizationDetailsType(), outcome == null ? null : outcome.stoppedBecause(),
-                outcome == null ? List.of() : outcome.steps(), objects, findings);
+                outcome == null ? List.of() : outcome.steps(), objects, findings, useCase.id());
         store.saveReceipt(receipt);
         return receipt;
     }
@@ -189,7 +202,7 @@ public class ReceiveService {
 
     // ------------------------------------------------------------------ findings about the embedded manifest
 
-    private void inspectEmbedded(JsonNode manifest, List<JsonNode> resources, List<ArexClient.Finding> findings) {
+    private void inspectEmbedded(JsonNode manifest, List<JsonNode> resources, List<ArexClient.Finding> findings, String ourOrganization) {
         ManifestFacts facts = ManifestFacts.of(manifest);
         if (facts.expires() != null) {
             try {

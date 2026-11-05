@@ -13,12 +13,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import org.ohia.facade.common.BadDataException;
+import org.ohia.facade.common.UseCase;
 import org.ohia.facade.config.FacadeProperties;
+import org.ohia.facade.config.UseCaseProperties;
 import org.ohia.facade.hapi.HapiClient;
 import org.springframework.stereotype.Service;
 
 /**
- * Loads the UC07 interaction-01 package into HAPI from the data repository at a pinned commit.
+ * Loads a use case's interaction-01 package (UC07 or UC04a) into HAPI from the data repository at a pinned commit.
  *
  * <p>Order matters: everything is fetched and checked first (structure, and every ARex payload
  * against its declared SHA-256), and only then is anything written. A bad or tampered source
@@ -37,10 +39,12 @@ public class SeedService {
     private final HapiClient hapi;
     private final PackageStore store;
     private final ObjectMapper mapper;
+    private final UseCaseProperties useCases;
 
-    public SeedService(FacadeProperties props, RemoteFetcher fetcher, HapiClient hapi, PackageStore store,
-            ObjectMapper mapper) {
+    public SeedService(FacadeProperties props, UseCaseProperties useCases, RemoteFetcher fetcher, HapiClient hapi,
+            PackageStore store, ObjectMapper mapper) {
         this.props = props;
+        this.useCases = useCases;
         this.fetcher = fetcher;
         this.hapi = hapi;
         this.store = store;
@@ -52,8 +56,15 @@ public class SeedService {
     }
 
     public SeedResult seed() {
+        return seed(UseCase.UC07);
+    }
+
+    public SeedResult seed(UseCase useCase) {
         FacadeProperties.Seed s = props.seed();
-        String base = strip(s.dataBaseUrl()) + "/" + s.dataRef() + "/" + strip(s.packagePath());
+        String ref = useCase == UseCase.UC04A && useCases.uc04a().dataRef() != null && !useCases.uc04a().dataRef().isBlank()
+                ? useCases.uc04a().dataRef() : s.dataRef();
+        String path = useCase == UseCase.UC04A ? useCases.uc04a().packagePath() : s.packagePath();
+        String base = strip(s.dataBaseUrl()) + "/" + ref + "/" + strip(path);
 
         byte[] bundleBytes = fetcher.fetch(base + "/interaction-01-bundle.json", MAX_BYTES);
         JsonNode bundle = parse(bundleBytes);
@@ -100,7 +111,7 @@ public class SeedService {
             }
             JsonNode att = r.path("content").path(0).path("attachment");
             String declared = declaredSha256(att, id);
-            byte[] data = fetcher.fetch(base + "/arex-payloads/radiograph-" + id.substring(ENTRY_PREFIX.length()) + ".png",
+            byte[] data = fetcher.fetch(base + "/arex-payloads/" + payloadFileName(useCase, id.substring(ENTRY_PREFIX.length())),
                     MAX_BYTES);
             String actual = sha256(data);
             if (!actual.equals(declared)) {
@@ -116,8 +127,13 @@ public class SeedService {
         }
 
         hapi.postTransaction(new String(bundleBytes, StandardCharsets.UTF_8));
-        store.save(new PackageIndex(s.dataRef(), manifestId, resources, payloadIndex), payloads);
-        return new SeedResult(s.dataRef(), manifestId, resources.size(), counts, payloadIndex.size());
+        store.save(useCase, new PackageIndex(ref, manifestId, resources, payloadIndex), payloads);
+        return new SeedResult(ref, manifestId, resources.size(), counts, payloadIndex.size());
+    }
+
+    /** Where the data repository keeps each use case's ARex payload for the entry named arex-entry-&lt;name&gt;. */
+    static String payloadFileName(UseCase useCase, String name) {
+        return useCase == UseCase.UC04A ? "intraoral-" + name + ".jpg" : "radiograph-" + name + ".png";
     }
 
     private String declaredSha256(JsonNode attachment, String entryId) {

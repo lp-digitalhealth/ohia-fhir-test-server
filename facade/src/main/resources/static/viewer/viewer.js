@@ -42,14 +42,26 @@
     } catch (e) { /* storage may be blocked; the token then lives only in memory */ }
   }
 
+  function failure(r) {
+    if (r.status === 401) { return Promise.reject(new Error('The access token was not accepted.')); }
+    return r.json().catch(function () { return {}; }).then(function (b) {
+      throw new Error(b && b.error ? b.error : 'The server answered ' + r.status + '.');
+    });
+  }
+
   function api(path) {
     return fetch(path, { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }, cache: 'no-store' })
-      .then(function (r) {
-        if (r.status === 401) { throw new Error('The access token was not accepted.'); }
-        if (!r.ok) { throw new Error('The server answered ' + r.status + '.'); }
-        return r;
-      });
+      .then(function (r) { return r.ok ? r : failure(r); });
   }
+
+  function apiPost(path, body) {
+    var headers = { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' };
+    var init = { method: 'POST', headers: headers, cache: 'no-store' };
+    if (body !== undefined) { headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(body); }
+    return fetch(path, init).then(function (r) { return r.ok ? r : failure(r); });
+  }
+
+  function useCaseLabel(id) { return id === 'uc07' ? 'UC07' : 'UC04a'; }
 
   function badge(text, kind) { return el('span', text, 'badge ' + kind); }
 
@@ -70,17 +82,18 @@
     var host = $('list');
     clear(host);
     if (!receipts.length) {
-      host.appendChild(el('p', 'No payloads received yet.', 'empty'));
+      host.appendChild(el('p', 'Nothing received yet.', 'empty'));
       return;
     }
     var table = el('table');
     var head = el('tr');
-    ['Received', 'Referral', 'Manifest', 'Images', 'Findings', ''].forEach(function (h) { head.appendChild(el('th', h)); });
+    ['Received', 'Use case', 'Referral', 'Manifest', 'Images', 'Findings', ''].forEach(function (h) { head.appendChild(el('th', h)); });
     table.appendChild(head);
     receipts.forEach(function (r) {
       var saved = r.objects.filter(function (o) { return o.status === 'saved'; }).length;
       var row = el('tr');
       row.appendChild(el('td', shortTime(r.receivedAt)));
+      row.appendChild(el('td', useCaseLabel(r.useCase)));
       row.appendChild(el('td', r.referralId || '(none)', 'mono'));
       row.appendChild(el('td', r.manifestId || '(none)', 'mono'));
       row.appendChild(el('td', saved + ' of ' + r.objects.length + ' saved'));
@@ -99,7 +112,8 @@
   function loadList() {
     if (!token) { say('Enter the access token first.', true); return Promise.resolve(); }
     say('Loading...');
-    return api('/ode/receipts?limit=50').then(function (r) { return r.json(); }).then(function (data) {
+    var only = $('filter-usecase').value;
+    return api('/ode/receipts?limit=50' + (only ? '&useCase=' + encodeURIComponent(only) : '')).then(function (r) { return r.json(); }).then(function (data) {
       renderList(data);
       say('Loaded ' + data.length + ' receipt(s).');
     }).catch(function (e) { say(e.message, true); });
@@ -133,6 +147,7 @@
 
     var dl = el('dl', null, 'facts');
     fact(dl, 'Received', shortTime(r.receivedAt));
+    fact(dl, 'Use case', useCaseLabel(r.useCase));
     fact(dl, 'Referral id', r.referralId);
     fact(dl, 'Manifest id', r.manifestId);
     var dropped = r.findings.some(function (f) { return f.code === 'SUBSCRIPTION_NOT_STORED'; });
@@ -223,6 +238,155 @@
       .catch(function (e) { caption.textContent = o.entryId + ': ' + e.message; });
   }
 
+
+  // ---------------------------------------------------------------- tabs
+
+  var VIEWS = ['received', 'send', 'sent'];
+
+  function showView(name) {
+    VIEWS.forEach(function (v) {
+      $('view-' + v).hidden = v !== name;
+      $('tab-' + v).setAttribute('aria-pressed', v === name ? 'true' : 'false');
+    });
+    if (!token) { return; }
+    if (name === 'send') { loadClients(); refreshSeedStatus(); }
+    if (name === 'sent') { loadSent(); }
+  }
+
+  // ---------------------------------------------------------------- send
+
+  var clients = [];
+  var lastAutoTarget = '';
+
+  function sendSay(text, isError) {
+    var m = $('send-message');
+    m.textContent = text || '';
+    m.className = isError ? 'message error' : 'message';
+  }
+
+  function chosenUseCase() { return $('send-usecase').value; }
+
+  function chosenClient() {
+    var id = $('send-client').value;
+    return clients.filter(function (c) { return c.clientId === id; })[0] || null;
+  }
+
+  function fillTargetFromClient() {
+    var c = chosenClient();
+    var box = $('send-target');
+    var first = c && c.allowedTargetPrefixes.length ? c.allowedTargetPrefixes[0] : '';
+    if (box.value === '' || box.value === lastAutoTarget) { box.value = first; lastAutoTarget = first; }
+  }
+
+  function loadClients() {
+    return api('/ode/clients').then(function (r) { return r.json(); }).then(function (list) {
+      clients = list;
+      var select = $('send-client');
+      var keep = select.value;
+      clear(select);
+      if (!list.length) { select.appendChild(el('option', 'No testers are registered yet')); select.disabled = true; sendSay('The organizer must register a tester first.', true); return; }
+      select.disabled = false;
+      list.forEach(function (c) {
+        var label = c.clientId + ' (plays ' + c.organizations[chosenUseCase()] + ')';
+        var o = el('option', label);
+        o.value = c.clientId;
+        select.appendChild(o);
+      });
+      if (keep) { select.value = keep; }
+      fillTargetFromClient();
+    }).catch(function (e) { sendSay(e.message, true); });
+  }
+
+  function refreshSeedStatus() {
+    var uc = chosenUseCase();
+    return api('/ode/package?useCase=' + encodeURIComponent(uc)).then(function (r) { return r.json(); }).then(function (p) {
+      $('seed-status').textContent = p.seeded
+        ? useCaseLabel(uc) + ' data is loaded (' + p.resources + ' resources, ' + p.payloads.length + ' image(s), data version ' + String(p.ref).slice(0, 7) + ').'
+        : useCaseLabel(uc) + ' data is not loaded yet. Click "Load the data" first.';
+    }).catch(function (e) { $('seed-status').textContent = e.message; });
+  }
+
+  function seedData() {
+    var uc = chosenUseCase();
+    $('seed-button').disabled = true;
+    sendSay('Loading ' + useCaseLabel(uc) + ' data from the data repository...');
+    return apiPost('/ode/admin/seed?useCase=' + encodeURIComponent(uc)).then(function (r) { return r.json(); }).then(function (s) {
+      sendSay('Loaded ' + s.resources + ' resources and verified ' + s.payloadsVerified + ' image(s) (data version ' + String(s.ref).slice(0, 7) + ').');
+      return refreshSeedStatus();
+    }).catch(function (e) { sendSay(e.message, true); }).then(function () { $('seed-button').disabled = false; });
+  }
+
+  function renderSendResult(r) {
+    var host = $('send-result');
+    clear(host);
+    var dl = el('dl', null, 'facts');
+    var kind = r.outcome === 'delivered' ? 'ok' : 'bad';
+    dl.appendChild(el('dt', 'Outcome'));
+    var dd = el('dd');
+    dd.appendChild(badge(r.outcome, kind));
+    dl.appendChild(dd);
+    fact(dl, 'Use case', useCaseLabel(r.useCase));
+    fact(dl, 'Tester', r.clientId);
+    fact(dl, 'Sent to', r.targetBaseUrl);
+    fact(dl, 'Their answer', r.targetStatus > 0 ? String(r.targetStatus) : '(no answer)');
+    fact(dl, 'Referral id', r.referralId);
+    fact(dl, 'Image list (manifest)', r.manifestId);
+    fact(dl, 'Images available until', shortTime(r.manifestExpires));
+    fact(dl, 'Error', r.error);
+    fact(dl, 'Their reply (start)', r.targetResponseExcerpt);
+    host.appendChild(dl);
+  }
+
+  function sendReferral(ev) {
+    ev.preventDefault();
+    var c = chosenClient();
+    var target = $('send-target').value.trim();
+    if (!c) { sendSay('Pick a tester first.', true); return; }
+    if (!target) { sendSay('Enter the address to send to.', true); return; }
+    if (!window.confirm('Send the ' + useCaseLabel(chosenUseCase()) + ' referral to ' + c.clientId + ' at ' + target + '?')) { return; }
+    var body = { clientId: c.clientId, targetBaseUrl: target, useCase: chosenUseCase() };
+    var bearer = $('send-bearer').value;
+    if (bearer) { body.targetBearerToken = bearer; }
+    $('send-button').disabled = true;
+    sendSay('Sending...');
+    clear($('send-result'));
+    apiPost('/ode/send', body).then(function (r) { return r.json(); }).then(function (r) {
+      sendSay(r.outcome === 'delivered' ? 'Delivered.' : 'Not delivered: ' + r.outcome + '.', r.outcome !== 'delivered');
+      renderSendResult(r);
+    }).catch(function (e) { sendSay(e.message, true); }).then(function () {
+      $('send-bearer').value = '';
+      $('send-button').disabled = false;
+    });
+  }
+
+  // ---------------------------------------------------------------- sent log
+
+  function loadSent() {
+    return api('/ode/sends?limit=50').then(function (r) { return r.json(); }).then(function (rows) {
+      var host = $('sent-list');
+      clear(host);
+      if (!rows.length) { host.appendChild(el('p', 'Nothing sent yet.', 'empty')); return; }
+      var table = el('table');
+      var head = el('tr');
+      ['Sent', 'Use case', 'Tester', 'Sent to', 'Outcome', 'Their answer', 'Referral'].forEach(function (h) { head.appendChild(el('th', h)); });
+      table.appendChild(head);
+      rows.forEach(function (s) {
+        var row = el('tr');
+        row.appendChild(el('td', shortTime(s.at)));
+        row.appendChild(el('td', useCaseLabel(s.useCase)));
+        row.appendChild(el('td', s.clientId));
+        row.appendChild(el('td', s.targetBaseUrl, 'mono'));
+        var o = el('td');
+        o.appendChild(badge(s.outcome, s.outcome === 'delivered' ? 'ok' : 'bad'));
+        row.appendChild(o);
+        row.appendChild(el('td', s.targetStatus > 0 ? s.targetStatus : '-'));
+        row.appendChild(el('td', s.referralId || '(none)', 'mono'));
+        table.appendChild(row);
+      });
+      host.appendChild(table);
+    }).catch(function (e) { say(e.message, true); });
+  }
+
   // ---------------------------------------------------------------- wiring
 
   $('auth-form').addEventListener('submit', function (ev) {
@@ -231,6 +395,7 @@
     storeToken(token);
     $('detail-card').hidden = true;
     loadList();
+    loadClients();
   });
 
   $('forget').addEventListener('click', function () {
@@ -241,11 +406,25 @@
     clear($('list'));
     clear($('detail'));
     $('detail-card').hidden = true;
+    clear($('sent-list'));
+    clear($('send-result'));
+    clear($('send-client'));
+    clients = [];
+    $('send-bearer').value = '';
+    $('seed-status').textContent = '';
+    sendSay('');
     say('Token forgotten.');
   });
 
   $('refresh').addEventListener('click', loadList);
+  $('filter-usecase').addEventListener('change', loadList);
+  $('refresh-sent').addEventListener('click', loadSent);
+  $('seed-button').addEventListener('click', seedData);
+  $('send-form').addEventListener('submit', sendReferral);
+  $('send-client').addEventListener('change', fillTargetFromClient);
+  $('send-usecase').addEventListener('change', function () { loadClients(); refreshSeedStatus(); });
+  VIEWS.forEach(function (v) { $('tab-' + v).addEventListener('click', function () { showView(v); }); });
 
   token = readStoredToken();
-  if (token) { loadList(); }
+  if (token) { loadList(); loadClients(); }
 }());

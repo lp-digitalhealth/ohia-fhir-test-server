@@ -63,7 +63,7 @@ function writeHostileReceipt() {
   page.on('request', (r) => {
     const u = new URL(r.url());
     if (u.protocol === 'blob:' || u.protocol === 'data:') { return; }
-    const ok = u.origin === origin && (u.pathname.startsWith('/viewer') || u.pathname.startsWith('/ode/receipts'));
+    const ok = u.origin === origin && (u.pathname.startsWith('/viewer') || u.pathname.startsWith('/ode/receipts') || u.pathname === '/ode/clients');
     if (!ok) { stray.push(r.url()); }
   });
   const consoleErrors = [];
@@ -71,11 +71,11 @@ function writeHostileReceipt() {
 
   // ---- 1. the page, from the real server
   const resp = await page.goto(FACADE + '/viewer/');
-  check('the page loads from the real server at /viewer/', resp.status() === 200 && (await page.title()) === 'Received payloads', resp.status());
+  check('the page loads from the real server at /viewer/', resp.status() === 200 && (await page.title()) === 'OHIA test server', resp.status());
   const csp = resp.headers()['content-security-policy'] || '';
   check('it is served with a strict Content-Security-Policy', csp.includes("script-src 'self'") && !csp.includes('unsafe-inline') && csp.includes("frame-ancestors 'none'"), csp);
   const noSlash = await page.goto(FACADE + '/viewer');
-  check('/viewer (no trailing slash) forwards to the page', noSlash.status() === 200 && (await page.title()) === 'Received payloads');
+  check('/viewer (no trailing slash) forwards to the page', noSlash.status() === 200 && (await page.title()) === 'OHIA test server');
   await page.goto(FACADE + '/viewer/');
   check('a person with no token sees no data', (await page.locator('#list').innerText()).trim() === '');
 
@@ -126,7 +126,7 @@ function writeHostileReceipt() {
   // ---- 4. the browser really enforces the CSP, and nothing left the origin
   const inline = await page.evaluate(() => { const s = document.createElement('script'); s.textContent = 'window.__csp = 1'; document.head.appendChild(s); return window.__csp; });
   check('the browser blocks an injected inline script (CSP is enforced)', inline === undefined);
-  check('no request went anywhere except the page, the viewer files and /ode/receipts', stray.length === 0, JSON.stringify(stray));
+  check('no request went anywhere except the page, the viewer files, /ode/receipts and /ode/clients', stray.length === 0, JSON.stringify(stray));
 
   // ---- 5. forgetting the token
   await page.click('#forget');

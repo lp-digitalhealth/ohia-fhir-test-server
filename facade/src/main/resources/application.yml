@@ -16,6 +16,15 @@ facade:
     data-base-url: ${FACADE_SEED_DATA_BASE_URL:https://raw.githubusercontent.com/lp-digitalhealth/ohia-test-data}
     data-ref: ${FACADE_SEED_DATA_REF:445d4ce7460c6e62000e275da84258c84bfa873d}
     package-path: 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-01
+  use-cases:
+    uc04a:
+      # UC04a interaction 1 (the platform's referral with intraoral photos). Pinned commit of the data repository
+      # that carries the Subscription fix (PR 45); never a moving branch.
+      data-ref: ${FACADE_UC04A_DATA_REF:bafcf439092c2bb868c70336057f928f2428d457}
+      package-path: 2026-CMS-Connectathon/fhir-resources/purpose-built/uc04a-teledentistry-commercial/interactions/interaction-01
+    receiving:
+      # The organization we play when a tester sends US a UC07 referral (the receiving specialist).
+      uc07-requesting-organization: ${FACADE_UC07_RECEIVER_ORG:Organization/org-restorative-dental-tx}
   send:
     # Both flags below exist for automated tests only and must stay false in a deployment.
     allow-http: false

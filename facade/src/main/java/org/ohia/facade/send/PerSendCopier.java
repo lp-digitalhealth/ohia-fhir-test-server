@@ -62,7 +62,7 @@ public final class PerSendCopier {
         }
         if (!organizationPresent) {
             throw new BadDataException("The registered organization " + requestingOrganization
-                    + " is not in the UC07 package, so the sent manifest would point at nothing. Fix the registry entry.");
+                    + " is not in the package being sent, so the sent manifest would point at nothing. Fix the registry entry.");
         }
 
         // 1. which resources get new ids
