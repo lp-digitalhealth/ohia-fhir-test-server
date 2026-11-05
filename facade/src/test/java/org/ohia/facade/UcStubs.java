@@ -28,6 +28,10 @@ public final class UcStubs {
     public static final AtomicReference<String> lastPost = new AtomicReference<>();
     public static final Map<String, JsonNode> hapiStore = new ConcurrentHashMap<>();
     public static volatile boolean tamper;
+    /** Status the stand-in HAPI answers to a transaction POST (anything but 200 simulates HAPI refusing it). */
+    public static volatile int postStatus = 200;
+    /** When true the stand-in HAPI refuses (422) only a transaction that contains a Subscription, as real HAPI 8.12 does for the UC04a one. */
+    public static volatile boolean refuseSubscriptions;
 
     private static final HttpServer dataHost;
     private static final HttpServer hapi;
@@ -61,6 +65,8 @@ public final class UcStubs {
         posts.set(0);
         lastPost.set(null);
         tamper = false;
+        postStatus = 200;
+        refuseSubscriptions = false;
     }
 
     public static byte[] fixtureBytes(String name) {
@@ -100,6 +106,14 @@ public final class UcStubs {
             String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             posts.incrementAndGet();
             lastPost.set(body);
+            if (refuseSubscriptions && body.contains("\"resourceType\":\"Subscription\"")) {
+                respond(ex, 422, "{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"diagnostics\":\"HAPI-0011: backport-filter-criteria must be populated\"}]}".getBytes(StandardCharsets.UTF_8));
+                return;
+            }
+            if (postStatus != 200) {
+                respond(ex, postStatus, "{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"processing\"}]}".getBytes(StandardCharsets.UTF_8));
+                return;
+            }
             for (JsonNode e : M.readTree(body).get("entry")) {
                 JsonNode r = e.get("resource");
                 hapiStore.put(r.get("resourceType").asText() + "/" + r.get("id").asText(), r);

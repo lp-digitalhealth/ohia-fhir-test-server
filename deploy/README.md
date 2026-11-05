@@ -75,7 +75,7 @@ docker compose pull && docker compose up -d   # update
 - **Tested on a stand-in upstream:** 401 without a token, with a wrong, shortened or extended token, and for writes; 200 with the right token; metadata and `OPTIONS` open; path tricks such as `metadata/../Patient` rejected; Compose refuses to start without `API_TOKEN`.
 - **Tested on the live server (real HAPI, Oracle Arm VM, 2026-11-04):** metadata 200 and Patient 401 without a token, Patient 200 with it, and a write without a token 401. **Not tested:** browser CORS behavior, the wrong-token and case-sensitivity cases on the live server, and load.
 
-## 8. The facade (UC07 sender and ARex content server)
+## 8. The facade (UC07 sender, ARex content server, UC04a receiver)
 
 A Java service in `../facade` runs beside HAPI and is routed by Caddy at `/ode/*` and `/arex/*` only; `/fhir` does not pass through it. What it does, its endpoints and the ARex rules it enforces are in `facade/README.md`. Decisions: S3, S4 and S5 in `docs/OHIA_FHIR_Test_server_PLAN.md`.
 
@@ -101,4 +101,15 @@ curl -s -H "Authorization: Bearer $TOKEN" $BASE/ode/sends                       
 ```
 
 - **Tested:** 94 automated tests, plus an end-to-end run in the sandbox against real HAPI 8.12.0 and the real data repository at the pinned commit (21 checks, all passed), with Caddy routing tested in front of a stand-in HAPI.
-- **Not tested:** the multi-stage `facade/Dockerfile` (the sandbox's proxy blocks Maven inside Docker builds), anything on the Arm VM, the facade behind the live Caddy and certificate, and any real tester's receiver. Expect to send me the output if the first `docker compose build facade` fails.
+- **Observed on the Arm VM (2026-11-05):** `docker compose build facade` succeeded and the container ran. Its Docker health check first reported `unhealthy` because of a probe bug (it searched for the text `200 OK`; Tomcat sends `HTTP/1.1 200`). The `Dockerfile` is fixed; after `git pull`, run `docker compose build facade` and `docker compose up -d` again and `docker compose ps` should show `healthy`.
+- **Not tested:** the facade behind the live Caddy and certificate (check `/ode/health` and `/arex/.well-known/smart-configuration`), and any real tester's receiver.
+
+## 9. Receiving UC04a and viewing the result
+
+The facade also receives UC04a interaction 1 and pulls its images with ARex (plan items S6 and S7). Testers send to `POST /ode/receive/uc04a`; the guide for them is `docs/UC04A_SENDING_GUIDE.md`.
+
+- **Roll out:** same steps as section 8 (`git pull`, `docker compose build facade`, `docker compose up -d`). The Caddyfile has a new open route for `/viewer/*`; `docker compose up -d` reloads it. The facade creates its own key on first use in the `facade_data` volume (`keys/server-key.json`); keep that volume or the key changes.
+- **Give a tester our identity:** `curl -s -H "Authorization: Bearer $TOKEN" $BASE/ode/identity`. The public key is open at `$BASE/arex/jwks.json`.
+- **See results:** open `$BASE/viewer/` and type the shared token, or `curl -s -H "Authorization: Bearer $TOKEN" $BASE/ode/receipts`.
+- **Tested in the sandbox:** 161 automated tests; an end-to-end run against real HAPI 8.12.0 with the real UC04a data and an independent Python sender (21 checks, all three payload variants); a Chromium check of the viewer (18 checks).
+- **Not tested:** the live VM and certificate, `/viewer/` and `/arex/jwks.json` through the live Caddy (the Caddyfile change is exercised only by reading it), and any real tester's ARex server.

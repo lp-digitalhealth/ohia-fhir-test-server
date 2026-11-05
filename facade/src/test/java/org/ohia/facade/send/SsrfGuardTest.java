@@ -13,7 +13,8 @@ class SsrfGuardTest {
 
     private static SsrfGuard guard(boolean allowHttp, boolean allowPrivate) {
         return new SsrfGuard(new FacadeProperties("http://hapi:8080/fhir", "https://x.test", "t", "/data", "/c.json",
-                new FacadeProperties.Seed("u", "r", "p"), new FacadeProperties.Send(allowHttp, allowPrivate, 30)));
+                new FacadeProperties.Seed("u", "r", "p"), new FacadeProperties.Send(allowHttp, allowPrivate, 30),
+                new FacadeProperties.Client("ohia-test-server", "/data/keys/server-key.json", "Organization/org-barton-springs-dental", "arex-manifest", 20, 10_000_000L, 50_000_000L, 5, 60)));
     }
 
     @ParameterizedTest
