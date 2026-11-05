@@ -30,7 +30,7 @@ This document is for coding assistants to put the current state of the repo
 - **Rollout (manual, owner):** `git pull`, `docker compose build facade`, `docker compose up -d`, then register a tester in `facade/config/clients.json` and seed (see `deploy/README.md` section 8).
 
 ## For testers
-`docs/CONSUMER_GUIDE.md` explains how to connect.
+`docs/CONSUMER_GUIDE.md` explains how to connect. `docs/AREX_RETRIEVAL_GUIDE.md` (with the tested script `docs/examples/arex_fetch.py`) explains how to retrieve the referral's images. `docs/FACADE_BUILD_GUIDE.md` explains how the facade was built, step by step, for anyone who wants to reproduce or adapt it.
 
 ## Not built yet (see the plan, sections 7 and 8)
 Role base paths, CRD/DTR/PAS, the 360X receiver (not needed for UC07, see S4), ODE referral validation feedback, SMART/OAuth for `/fhir`, the milestone H spike, and UC07 interactions 2 and 4 (interaction 1 exists in the data repo and is what the facade sends).

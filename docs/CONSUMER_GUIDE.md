@@ -97,6 +97,8 @@ When the organizer sends, your endpoint gets **one** request:
 - The Bundle shape is the server's reading of the draft ODE guide, which has no UC07 page. If your system expects something different, tell the organizer.
 
 ### 3. Fetch the images (ARex)
+A fuller, standalone guide with a tested script is in `docs/AREX_RETRIEVAL_GUIDE.md`.
+
 The content URLs in the manifest need a token; anonymous access is never allowed. Base URL below is the server's address with no `/fhir`.
 
 1. **Discover:** `GET <base>/arex/.well-known/smart-configuration` and read `token_endpoint`.

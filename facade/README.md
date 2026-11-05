@@ -5,6 +5,8 @@ A small Java service that runs **beside** HAPI. It lets the test server play the
 - Caddy routes only `/ode/*` and `/arex/*` here. `/fhir` never passes through it, so a facade problem cannot break or open the FHIR API.
 - Java 21, Spring Boot 3.5, JSON handled with Jackson, JWTs with Nimbus. Plan decisions: S3, S4, S5 in `docs/OHIA_FHIR_Test_server_PLAN.md`.
 
+How it was built, step by step (for anyone who wants to repeat or adapt it): `docs/FACADE_BUILD_GUIDE.md`. How a tester retrieves the images: `docs/AREX_RETRIEVAL_GUIDE.md`. An end-to-end run against real HAPI: `e2e/README.md`.
+
 ## What it does
 
 | Path | Who may call | What |
