@@ -84,7 +84,8 @@ A Java service in `../facade` runs beside HAPI and is routed by Caddy at `/ode/*
 ```bash
 git pull
 docker compose build facade      # builds the Java image on the VM (first build downloads Maven dependencies)
-docker compose up -d             # starts the facade and reloads Caddy's routes; HAPI and the database are not recreated
+docker compose up -d             # starts the new facade; HAPI and the database are not recreated
+docker compose up -d --force-recreate caddy   # only when deploy/Caddyfile changed (see the note below)
 docker compose ps                # facade should become healthy
 ```
 
@@ -108,8 +109,9 @@ curl -s -H "Authorization: Bearer $TOKEN" $BASE/ode/sends                       
 
 The facade also receives UC04a interaction 1 and pulls its images with ARex (plan items S6 and S7). Testers send to `POST /ode/receive/uc04a`; the guide for them is `docs/UC04A_SENDING_GUIDE.md`.
 
-- **Roll out:** same steps as section 8 (`git pull`, `docker compose build facade`, `docker compose up -d`). The Caddyfile has a new open route for `/viewer/*`; `docker compose up -d` reloads it. The facade creates its own key on first use in the `facade_data` volume (`keys/server-key.json`); keep that volume or the key changes.
+- **Roll out:** same steps as section 8 (`git pull`, `docker compose build facade`, `docker compose up -d`). The Caddyfile has a new open route for `/viewer/*`; Caddy does NOT pick that up from `docker compose up -d` or `caddy reload` (see the next point). The facade creates its own key on first use in the `facade_data` volume (`keys/server-key.json`); keep that volume or the key changes.
+- **When `deploy/Caddyfile` changes, recreate Caddy: `docker compose up -d --force-recreate caddy`.** Observed on the live VM (2026-11-05): `git pull` replaces the file, but the Caddy container keeps the old copy mounted, so `caddy reload` re-read the old file (`docker compose exec caddy grep -c viewer /etc/caddy/Caddyfile` printed 0 while the same grep on the host printed 2) and `/viewer/` and `/arex/jwks.json` still returned 401. Recreating the container fixed it (they then returned 200). The certificate is kept in the `caddy_data` volume; HAPI and the database are not touched.
 - **Give a tester our identity:** `curl -s -H "Authorization: Bearer $TOKEN" $BASE/ode/identity`. The public key is open at `$BASE/arex/jwks.json`.
 - **See results:** open `$BASE/viewer/` and type the shared token, or `curl -s -H "Authorization: Bearer $TOKEN" $BASE/ode/receipts`.
 - **Tested in the sandbox:** 161 automated tests; an end-to-end run against real HAPI 8.12.0 with the real UC04a data and an independent Python sender (21 checks, all three payload variants); a Chromium check of the viewer (18 checks).
-- **Not tested:** the live VM and certificate, `/viewer/` and `/arex/jwks.json` through the live Caddy (the Caddyfile change is exercised only by reading it), and any real tester's ARex server.
+- **Observed on the live VM (2026-11-05):** the facade built and was healthy; after recreating Caddy, `/viewer/` and `/arex/jwks.json` returned 200 and `/ode/identity` without a token returned 401. **Not tested:** a UC04a payload received on the live server, and any real tester's ARex server.
