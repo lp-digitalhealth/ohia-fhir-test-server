@@ -36,6 +36,13 @@ services:
       HAPI_FHIR_FHIR_VERSION: R4
       HAPI_FHIR_SUBSCRIPTION_RESTHOOK_ENABLED: "true"
       HAPI_FHIR_SERVER_ADDRESS: ${PUBLIC_BASE_URL:-http://localhost:8080}/fhir
+      # A tester's app may be given one of our addresses as its "FHIR base" and then write every reference in its
+      # Bundle as a full address under it (https://<host>/ode/receive/uc04a/Patient/x). HAPI refuses those as
+      # references to another server (HAPI-0507) unless the address is declared as our own. Declared here, they are
+      # stored as ordinary local references (Patient/x).
+      HAPI_FHIR_LOCAL_BASE_URLS_0: ${PUBLIC_BASE_URL:-http://localhost:8080}/ode/receive/uc04a
+      HAPI_FHIR_LOCAL_BASE_URLS_1: ${PUBLIC_BASE_URL:-http://localhost:8080}/ode/receive/uc07
+      HAPI_FHIR_LOCAL_BASE_URLS_2: ${PUBLIC_BASE_URL:-http://localhost:8080}/fhir
     # No published ports: reachable only through Caddy.
 
   # Java facade: UC07 ODE referral sender and ARex content server. Built from ../facade.

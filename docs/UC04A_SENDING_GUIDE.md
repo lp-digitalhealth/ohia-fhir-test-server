@@ -16,7 +16,8 @@ curl -X POST "https://<server>/ode/receive/uc04a" \
 ```
 
 - The body is the UC04a interaction 1 **transaction Bundle**, with the ARex manifest embedded: a manifest `List` (profile `arex-manifest`), one `DocumentReference` per image (profile `arex-content-entry`) and the manifest `Provenance`. Maximum 10 MB (413 above that).
-- Not a transaction Bundle: **422**, nothing stored. HAPI refuses it for a reason we cannot work around: **502**, no pull.
+- Not a transaction Bundle: **422**, nothing stored. HAPI refuses it for a reason we cannot work around: **502**, no pull; the reply's `"error"` line says why.
+- **References inside the Bundle.** Write them as ordinary relative references (`Patient/patient-sarah-okonkwo`), or as full addresses under `https://<server>/fhir/`. If your app was given `.../ode/receive/uc04a` as a "FHIR base" and wrote full addresses under that, they are accepted too (they are declared as ours). A reference to any other server is refused with `HAPI-0507` and a 502.
 - Otherwise **200** with a **receipt** (JSON). A failed pull is a result, not an error: read `findings` and `objects`.
 
 The shared token is the same interim token as the rest of the server (plan item S1).
