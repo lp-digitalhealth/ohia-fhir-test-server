@@ -76,13 +76,7 @@ public class ReceiveController {
             return ResponseEntity.notFound().build();
         }
         boolean viewable = receipt.objects().stream().anyMatch(o -> fileKey.equals(o.fileKey()) && o.viewable());
-        String sniffed = org.ohia.facade.receive.ImageSniffer.sniff(bytes);
-        ResponseEntity.BodyBuilder b = noStore(ResponseEntity.ok()).header("X-Content-Type-Options", "nosniff");
-        if (viewable && sniffed != null) {
-            return b.contentType(MediaType.parseMediaType(sniffed)).header(HttpHeaders.CONTENT_DISPOSITION, "inline").body(bytes);
-        }
-        return b.contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileKey + ".bin\"").body(bytes);
+        return ImageResponse.of(bytes, viewable, fileKey);
     }
 
     private static ResponseEntity.BodyBuilder noStore(ResponseEntity.BodyBuilder b) {

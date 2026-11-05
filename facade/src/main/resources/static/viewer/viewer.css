@@ -118,3 +118,20 @@ button:disabled { opacity: 0.55; cursor: default; }
 /* The send form is a column of labelled fields, not the one-line token form. */
 #send-form { display: block; }
 .field input, .field select { flex: none; width: 100%; max-width: 640px; }
+
+/* Image viewer */
+button.thumb { display: block; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: #ffffff; cursor: zoom-in; }
+button.thumb img { display: block; max-width: 100%; height: auto; border: 0; border-radius: 6px; }
+.lightbox { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(8, 10, 14, 0.82); }
+.lightbox[hidden] { display: none; }
+.lightbox-box { background: var(--card); color: var(--text); border-radius: 10px; padding: 14px; max-width: 96vw; max-height: 96vh; display: flex; flex-direction: column; gap: 6px; }
+.lightbox-title { margin: 0; font-weight: 700; word-break: break-word; }
+.lightbox-meta { margin: 0; color: var(--muted); }
+.lightbox-stage { overflow: auto; max-width: 92vw; max-height: 68vh; text-align: center; background: #ffffff; border-radius: 6px; }
+.lightbox-stage img { max-width: 92vw; max-height: 68vh; object-fit: contain; }
+.lightbox-stage.actual img { max-width: none; max-height: none; object-fit: none; }
+/* Placeholder images can be a few pixels wide: show them at a usable size, crisp rather than blurred. Real photos are
+   shrunk to fit as usual, and "Actual size" shows the true pixels. */
+button.thumb img { width: 160px; max-width: 100%; height: auto; image-rendering: pixelated; }
+.lightbox-stage img { min-width: min(320px, 92vw); image-rendering: pixelated; }
+.lightbox-stage.actual img { min-width: 0; }

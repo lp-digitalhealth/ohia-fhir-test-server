@@ -16,6 +16,8 @@ if (!TOKEN || !DATA) { console.error('API_TOKEN and FACADE_DATA_DIR are required
 const results = [];
 function check(name, ok, detail) { results.push([name, ok]); console.log((ok ? 'PASS ' : 'FAIL ') + name + (detail !== undefined ? ' | ' + detail : '')); }
 
+const decoded = (page, sel, n) => page.waitForFunction(([q, k]) => { const i = [...document.querySelectorAll(q)]; return i.length === k && i.every((x) => x.complete && x.naturalWidth > 0); }, [sel, n], { timeout: 20000 });
+
 const got = [];
 const tester = http.createServer((req, res) => {
   const chunks = [];
@@ -59,6 +61,31 @@ const tester = http.createServer((req, res) => {
   check('the tester list shows the tester and the organization it plays for UC04a', options.length === 1 && options[0].includes('tester-ui') && options[0].includes('org-barton-springs-dental'), JSON.stringify(options));
   check('the address is prefilled from the tester\'s allowed address', (await page.inputValue('#send-target')) === 'http://127.0.0.1:' + PORT + '/fhir', await page.inputValue('#send-target'));
 
+  // ---- image viewer on the Send tab: the images this referral will carry
+  await decoded(page, '#send-preview img', 2);
+  check('the Send tab previews the two photos this referral will carry, decoded by the browser', (await page.locator('#send-preview figure').count()) === 2);
+  await page.locator('#send-preview button.thumb').first().click();
+  check('clicking a photo opens the viewer', await page.locator('#lightbox').isVisible());
+  await page.waitForFunction(() => { const i = document.getElementById('lightbox-img'); return i.complete && i.naturalWidth > 0; });
+  check('the viewer shows it large, with its name, type, size and checksum', (await page.locator('#lightbox-title').innerText()) === 'arex-entry-photo-1' && /image\/jpeg, 632 bytes, sha-256 [0-9a-f]{64}/.test(await page.locator('#lightbox-meta').innerText()), await page.locator('#lightbox-meta').innerText());
+  check('it says which image of how many', (await page.locator('#lightbox-count').innerText()) === '1 of 2');
+  await page.keyboard.press('ArrowRight');
+  check('the right arrow key shows the next image', (await page.locator('#lightbox-title').innerText()) === 'arex-entry-photo-2' && (await page.locator('#lightbox-count').innerText()) === '2 of 2');
+  await page.click('#lightbox-next');
+  check('Next wraps round to the first', (await page.locator('#lightbox-title').innerText()) === 'arex-entry-photo-1');
+  await page.click('#lightbox-prev');
+  check('Previous goes back (and wraps)', (await page.locator('#lightbox-title').innerText()) === 'arex-entry-photo-2');
+  await page.screenshot({ path: path.join(SHOTS, 'ui-5-lightbox.png') });
+  await page.click('#lightbox-zoom');
+  const actual = await page.evaluate(() => ({ cls: document.getElementById('lightbox-stage').className, max: getComputedStyle(document.getElementById('lightbox-img')).maxWidth }));
+  check('Actual size lifts the fit limit, and the button says how to go back', actual.cls.includes('actual') && actual.max === 'none' && (await page.locator('#lightbox-zoom').innerText()) === 'Fit to screen', JSON.stringify(actual));
+  await page.screenshot({ path: path.join(SHOTS, 'ui-6-lightbox-actual-size.png') });
+  await page.keyboard.press('Escape');
+  check('Escape closes the viewer and puts focus back on the photo you clicked', !(await page.locator('#lightbox').isVisible()) && (await page.evaluate(() => document.activeElement && document.activeElement.className)) === 'thumb');
+  await page.locator('#send-preview button.thumb').first().click();
+  await page.mouse.click(5, 5); // the dark backdrop
+  check('clicking the dark backdrop closes it too', !(await page.locator('#lightbox').isVisible()));
+
   await page.fill('#send-bearer', 'tester-secret-token-xyz');
   await page.screenshot({ path: path.join(SHOTS, 'ui-1-send.png'), fullPage: true });
   await page.click('#send-button');
@@ -90,6 +117,12 @@ const tester = http.createServer((req, res) => {
   await page.waitForSelector('#sent-list tr td');
   const sentRows = await page.locator('#sent-list tr').allInnerTexts();
   check('the Sent tab lists the delivery: UC04a, the tester, delivered', sentRows.length === 2 && sentRows[1].includes('UC04a') && sentRows[1].includes('tester-ui') && sentRows[1].includes('delivered'), JSON.stringify(sentRows));
+  await page.locator('#sent-list tr').nth(1).getByRole('button', { name: 'Images' }).click();
+  await decoded(page, '#sent-detail img', 2);
+  check('the Sent tab shows the two photos that send carried', (await page.locator('#sent-detail figure').count()) === 2 && (await page.locator('#sent-detail').innerText()).includes('UC04a referral REF-2026-UC04A-001-'));
+  await page.locator('#sent-detail button.thumb').nth(1).click();
+  check('and the viewer opens on the one you clicked', (await page.locator('#lightbox-title').innerText()) === 'arex-entry-photo-2');
+  await page.keyboard.press('Escape');
   await page.screenshot({ path: path.join(SHOTS, 'ui-3-sent-tab.png'), fullPage: true });
 
   // ---- Received tab, UC07
@@ -102,6 +135,10 @@ const tester = http.createServer((req, res) => {
   await page.waitForFunction(() => { const i = [...document.querySelectorAll('#detail img')]; return i.length === 2 && i.every((x) => x.complete && x.naturalWidth > 0); }, null, { timeout: 20000 });
   const detail = await page.locator('#detail').innerText();
   check('the UC07 receipt shows its use case, referral id and both radiographs decoded by the browser', detail.includes('UC07') && detail.includes('REF-2026-UC07-001') && (await page.locator('#detail img').count()) === 2);
+  await page.locator('#detail button.thumb').first().click();
+  await page.waitForFunction(() => { const i = document.getElementById('lightbox-img'); return i.complete && i.naturalWidth > 0; });
+  check('a received PNG opens in the same viewer', /image\/png, \d+ bytes, sha-256 [0-9a-f]{64}/.test(await page.locator('#lightbox-meta').innerText()) && (await page.locator('#lightbox-count').innerText()) === '1 of 2', await page.locator('#lightbox-meta').innerText());
+  await page.keyboard.press('Escape');
   await page.screenshot({ path: path.join(SHOTS, 'ui-4-received-uc07.png'), fullPage: true });
   await page.selectOption('#filter-usecase', 'uc04a');
   await page.waitForFunction(() => document.getElementById('message').textContent.startsWith('Loaded'));

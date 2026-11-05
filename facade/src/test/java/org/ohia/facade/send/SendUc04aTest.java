@@ -192,6 +192,65 @@ class SendUc04aTest {
         assertEquals(0, receiver.received.size(), "nothing may be delivered");
     }
 
+    // ------------------------------------------------------------------ viewing the images we send
+
+    private ResultActions getImage(String path, boolean withToken) throws Exception {
+        var req = get(path);
+        return mvc.perform(withToken ? req.header("Authorization", "Bearer " + TOKEN) : req);
+    }
+
+    @Test
+    void theSeededPhotosCanBeViewedInlineAsRealJpegs() throws Exception {
+        seed("uc04a").andExpect(status().isOk());
+        byte[] photo = UcStubs.uc04aBytes("intraoral-photo-1.jpg");
+        byte[] got = getImage("/ode/package/images/uc04a/arex-entry-photo-1", true).andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Type", "image/jpeg"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Disposition", "inline"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("X-Content-Type-Options", "nosniff"))
+                .andReturn().getResponse().getContentAsByteArray();
+        assertArrayEquals(photo, got);
+    }
+
+    @Test
+    void theImageEndpointsNeedTheTokenAndRefuseWhatIsNotInThePackageOrTheSend() throws Exception {
+        seed("uc04a").andExpect(status().isOk());
+        getImage("/ode/package/images/uc04a/arex-entry-photo-1", false).andExpect(status().isUnauthorized());
+        getImage("/ode/package/images/uc04a/arex-entry-photo-9", true).andExpect(status().isNotFound());
+        getImage("/ode/package/images/uc07/arex-entry-photo-1", true).andExpect(status().isNotFound());   // UC07 not seeded
+        getImage("/ode/package/images/uc99/arex-entry-photo-1", true).andExpect(status().isUnprocessableEntity());
+        getImage("/ode/package/images/uc04a/..%2F..%2Fpackage%2Fuc04a-i1.json", true).andExpect(status().is4xxClientError());
+        getImage("/ode/sends/not-a-send/images/arex-entry-photo-1", true).andExpect(status().isNotFound());
+        getImage("/ode/sends/00000000-0000-0000-0000-000000000000/images/arex-entry-photo-1", false).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void theImagesASendCarriedCanBeViewedAndTheManifestListsThem() throws Exception {
+        seed("uc04a").andExpect(status().isOk());
+        JsonNode record = UcStubs.M.readTree(send("tester-a", "uc04a").andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        String sendId = record.get("sendId").asText();
+        byte[] got = getImage("/ode/sends/" + sendId + "/images/arex-entry-photo-2", true).andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Type", "image/jpeg"))
+                .andReturn().getResponse().getContentAsByteArray();
+        assertArrayEquals(UcStubs.uc04aBytes("intraoral-photo-2.jpg"), got);
+        getImage("/ode/sends/" + sendId + "/images/arex-entry-photo-9", true).andExpect(status().isNotFound());
+        mvc.perform(get("/ode/manifests/" + record.get("manifestId").asText()).header("Authorization", "Bearer " + TOKEN)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries.length()").value(2))
+                .andExpect(jsonPath("$.entries[0].entryId").value("arex-entry-photo-1"))
+                .andExpect(jsonPath("$.entries[0].contentType").value("image/jpeg"))
+                .andExpect(jsonPath("$.entries[0].size").value(632));
+    }
+
+    /** Control: if the stored bytes are not really an image, they are offered only as a download, never inline. */
+    @Test
+    void bytesThatAreNotAnImageAreOnlyEverADownload() throws Exception {
+        seed("uc04a").andExpect(status().isOk());
+        Files.write(dataDir.resolve("arex-payloads").resolve("arex-entry-photo-1.bin"), "<html><script>alert(1)</script></html>".getBytes(StandardCharsets.UTF_8));
+        getImage("/ode/package/images/uc04a/arex-entry-photo-1", true).andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Type", "application/octet-stream"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Disposition", org.hamcrest.Matchers.startsWith("attachment")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("X-Content-Type-Options", "nosniff"));
+    }
+
     @Test
     void sendingBeforeSeedingIsAClearConflict() throws Exception {
         send("tester-a", "uc04a").andExpect(status().isConflict());
