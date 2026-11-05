@@ -1,0 +1,23 @@
+{
+  "clients": [
+    {
+      "clientId": "tester-example",
+      "requestingOrganization": "Organization/org-restorative-dental-tx",
+      "allowedTargetPrefixes": [
+        "https://tester.example.org/fhir"
+      ],
+      "jwks": {
+        "keys": [
+          {
+            "kty": "RSA",
+            "kid": "tester-example-key-1",
+            "alg": "RS384",
+            "use": "sig",
+            "n": "<the tester's RSA public modulus, base64url>",
+            "e": "AQAB"
+          }
+        ]
+      }
+    }
+  ]
+}

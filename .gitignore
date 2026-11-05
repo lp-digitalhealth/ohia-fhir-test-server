@@ -26,3 +26,11 @@ replay_pid*
 # Local secrets: never commit
 .env
 deploy/.env
+
+# Facade: Maven build output, and the real client registry (holds tester public keys; keep it out of git)
+facade/target/
+facade/config/clients.json
+
+# Python bytecode (the example scripts are run and imported during testing)
+__pycache__/
+*.pyc
