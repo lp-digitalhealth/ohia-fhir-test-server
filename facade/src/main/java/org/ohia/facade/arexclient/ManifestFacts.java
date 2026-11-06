@@ -24,7 +24,7 @@ public record ManifestFacts(String status, String expires, String requestingOrga
                 for (JsonNode part : ext.path("extension")) {
                     String name = part.path("url").asText();
                     if ("requestingOrganization".equals(name)) {
-                        org = part.path("valueReference").path("reference").asText(null);
+                        org = FhirRefs.normalize(part.path("valueReference").path("reference").asText(null));
                     } else if ("businessIdentifier".equals(name) && business == null) {
                         JsonNode id = part.path("valueIdentifier");
                         business = id.path("system").asText("") + "|" + id.path("value").asText("");
@@ -36,7 +36,7 @@ public record ManifestFacts(String status, String expires, String requestingOrga
         for (JsonNode e : manifest.path("entry")) {
             String ref = e.path("item").path("reference").asText(null);
             if (ref != null) {
-                entries.add(ref);
+                entries.add(FhirRefs.normalize(ref));
             }
         }
         return new ManifestFacts(manifest.path("status").asText(null), expires, org, business, entries);

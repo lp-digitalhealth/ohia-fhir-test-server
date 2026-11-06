@@ -181,11 +181,15 @@
       var wrap = el('div', null, 'scroll');
       var table = el('table');
       var head = el('tr');
-      ['Entry', 'Result', 'Bytes', 'SHA-256 (computed)'].forEach(function (h) { head.appendChild(el('th', h)); });
+      var manifests = {};
+      r.objects.forEach(function (o) { if (o.manifestId) { manifests[o.manifestId] = true; } });
+      var several = Object.keys(manifests).length > 1;
+      (several ? ['Entry', 'Manifest', 'Result', 'Bytes', 'SHA-256 (computed)'] : ['Entry', 'Result', 'Bytes', 'SHA-256 (computed)']).forEach(function (h) { head.appendChild(el('th', h)); });
       table.appendChild(head);
       r.objects.forEach(function (o) {
         var row = el('tr');
         row.appendChild(el('td', o.entryId, 'mono'));
+        if (several) { row.appendChild(el('td', o.manifestId || '', 'mono')); }
         var s = el('td');
         s.appendChild(statusBadge(o.status));
         row.appendChild(s);
@@ -196,6 +200,14 @@
       wrap.appendChild(table);
       host.appendChild(wrap);
 
+      var files = r.objects.filter(function (o) { return o.status === 'saved' && !o.viewable && o.fileKey; });
+      if (files.length) {
+        host.appendChild(el('h3', 'Other files'));
+        host.appendChild(el('p', 'These are not images, so they are not shown here. Download one to open it on your own computer.', 'note'));
+        var list = el('p', null, 'row');
+        files.forEach(function (o) { list.appendChild(downloadButton(r.id, o)); });
+        host.appendChild(list);
+      }
       var thumbs = el('div', null, 'thumbs');
       host.appendChild(thumbs);
       addThumbs(thumbs, 'received', r.objects.filter(function (o) { return o.viewable && o.fileKey; }).map(function (o) {
@@ -217,6 +229,38 @@
     });
     if (!r.steps.length) { steps.appendChild(el('li', 'No pull was attempted.', 'none')); }
     host.appendChild(steps);
+  }
+
+  // ---------------------------------------------------------------- downloads
+
+  // The server hands non-image files over as a forced download (application/octet-stream), so they are never opened
+  // as a page here. The file name is built from OUR safe key and the declared type, never from sender text.
+  function extensionFor(type) {
+    if (type === 'application/pdf') { return '.pdf'; }
+    if (type === 'text/plain') { return '.txt'; }
+    return '.bin';
+  }
+
+  function downloadButton(receiptId, o) {
+    var button = el('button', 'Download ' + o.entryId + ' (' + o.bytes + ' bytes)', 'secondary');
+    button.type = 'button';
+    button.addEventListener('click', function () {
+      fetch('/ode/receipts/' + encodeURIComponent(receiptId) + '/images/' + encodeURIComponent(o.fileKey),
+        { headers: { 'Authorization': 'Bearer ' + token }, cache: 'no-store' })
+        .then(function (resp) { return resp.ok ? resp.blob() : Promise.reject(new Error('The server answered ' + resp.status + '.')); })
+        .then(function (blob) {
+          var url = URL.createObjectURL(blob);
+          var link = document.createElement('a');
+          link.href = url;
+          link.download = o.fileKey + extensionFor(o.declaredContentType);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+        })
+        .catch(function (e) { say(e.message, true); });
+    });
+    return button;
   }
 
   // ---------------------------------------------------------------- images

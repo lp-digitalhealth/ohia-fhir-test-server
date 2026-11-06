@@ -62,6 +62,12 @@ public class ArexClient {
     }
 
     private static final String ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
+    /** What we ask a sender's token to allow: the manifest, its content entries, their provenance, and the bytes. */
+    public static final String DEFAULT_SCOPE = "system/List.r system/DocumentReference.r system/Provenance.r system/Binary.r";
+
+    /** Overridable with facade.arex.scope (or FACADE_AREX_SCOPE) when a sender wants something else. */
+    @org.springframework.beans.factory.annotation.Value("${facade.arex.scope:" + DEFAULT_SCOPE + "}")
+    private String scope = DEFAULT_SCOPE;
 
     private final SsrfGuard guard;
     private final ClientAssertionSigner signer;
@@ -162,7 +168,7 @@ public class ArexClient {
             String form = "grant_type=client_credentials"
                     + "&client_assertion_type=" + enc(ASSERTION_TYPE)
                     + "&client_assertion=" + enc(signer.sign(tokenEndpoint))
-                    + "&scope=" + enc("system/List.rs system/Binary.r")
+                    + "&scope=" + enc(scope)
                     + "&authorization_details=" + enc("[{\"type\":\"" + type + "\",\"manifest\":\"" + manifestId + "\"}]");
             r = send(run, HttpRequest.newBuilder(uri).timeout(readTimeout()).header("Content-Type", "application/x-www-form-urlencoded")
                     .header("Accept", "application/json").POST(HttpRequest.BodyPublishers.ofString(form)).build(), 1_000_000);
@@ -290,7 +296,7 @@ public class ArexClient {
             return new ObjectResult(ref.entryId(), ref.url(), "digest-mismatch", r.bytes.length, actual, r.contentType);
         }
         if (ref.contentType() == null || !ref.contentType().startsWith("image/")) {
-            run.finding("CONTENT_TYPE_NOT_IMAGE", "local safety rule", ref.entryId() + " declares '" + ref.contentType() + "'; stored, but never shown inline.");
+            run.finding("CONTENT_TYPE_NOT_IMAGE", "local safety rule", ref.entryId() + " declares '" + ref.contentType() + "', not an image; stored and offered as a download, never shown inline.");
         }
         run.step("object " + ref.entryId(), true, r.bytes.length + " bytes, sha-256 verified");
         return new ObjectResult(ref.entryId(), ref.url(), "saved", r.bytes.length, actual, r.contentType);
