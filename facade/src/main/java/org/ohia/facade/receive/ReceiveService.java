@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.ohia.facade.arexclient.ArexClient;
+import org.ohia.facade.arexclient.FhirRefs;
 import org.ohia.facade.arexclient.ManifestFacts;
 import org.ohia.facade.common.BadDataException;
 import org.ohia.facade.common.UpstreamException;
@@ -76,15 +77,18 @@ public class ReceiveService {
                 resources.add(e.get("resource"));
             }
         }
-        JsonNode manifest = first(resources, "List", "arex-manifest");
+        List<JsonNode> manifests = all(resources, "List", "arex-manifest");
         List<JsonNode> contentEntries = all(resources, "DocumentReference", "arex-content-entry");
         String referralId = referralId(resources);
         List<ArexClient.Finding> findings = new ArrayList<>();
+        boolean several = manifests.size() > 1;
 
-        if (manifest == null || contentEntries.isEmpty()) {
+        if (manifests.isEmpty() || contentEntries.isEmpty()) {
             findings.add(new ArexClient.Finding("NO_AREX_MANIFEST", "F29", "The payload carries no ARex manifest with content entries; nothing to pull."));
         } else {
-            inspectEmbedded(manifest, resources, findings, ourOrganization(useCase));
+            for (JsonNode manifest : manifests) {
+                inspectEmbedded(manifest, resources, findings, ourOrganization(useCase), several);
+            }
         }
 
         // Store exactly what was received. A HAPI refusal throws (502) and nothing else happens, except
@@ -93,17 +97,74 @@ public class ReceiveService {
 
         String receiptId = UUID.randomUUID().toString();
         List<Receipt.ReceiptObject> objects = new ArrayList<>();
-        ArexClient.Outcome outcome = null;
-        if (manifest != null && !contentEntries.isEmpty()) {
-            outcome = pullAndRecord(receiptId, manifest, contentEntries, objects, findings);
+        List<ArexClient.Step> steps = new ArrayList<>();
+        List<String> stops = new ArrayList<>();
+        String arexBase = null;
+        String tokenEndpoint = null;
+        String adType = null;
+        Set<String> usedKeys = new HashSet<>();
+        if (!manifests.isEmpty() && !contentEntries.isEmpty()) {
+            for (Map.Entry<JsonNode, List<JsonNode>> group : entriesByManifest(manifests, contentEntries, findings, objects, usedKeys).entrySet()) {
+                String id = group.getKey().path("id").asText();
+                String tag = several ? "[" + id + "] " : "";
+                ArexClient.Outcome o = pullAndRecord(receiptId, group.getKey(), group.getValue(), objects, findings, usedKeys);
+                arexBase = arexBase == null ? o.arexBase() : arexBase;
+                tokenEndpoint = tokenEndpoint == null ? o.tokenEndpoint() : tokenEndpoint;
+                adType = adType == null ? o.authorizationDetailsType() : adType;
+                for (ArexClient.Step st : o.steps()) {
+                    steps.add(new ArexClient.Step(tag + st.name(), st.ok(), st.detail()));
+                }
+                if (o.stoppedBecause() != null) {
+                    stops.add(tag + o.stoppedBecause());
+                }
+            }
         }
 
-        Receipt receipt = new Receipt(receiptId, clock.instant(), referralId, manifest == null ? null : manifest.path("id").asText(null),
-                true, stored, outcome == null ? null : outcome.arexBase(), outcome == null ? null : outcome.tokenEndpoint(),
-                outcome == null ? null : outcome.authorizationDetailsType(), outcome == null ? null : outcome.stoppedBecause(),
-                outcome == null ? List.of() : outcome.steps(), objects, findings, useCase.id());
+        String manifestIds = manifests.isEmpty() ? null : String.join(", ", manifests.stream().map(m -> m.path("id").asText()).toList());
+        Receipt receipt = new Receipt(receiptId, clock.instant(), referralId, manifestIds, true, stored, arexBase, tokenEndpoint, adType,
+                stops.isEmpty() ? null : String.join(" | ", stops), steps, objects, findings, useCase.id());
         store.saveReceipt(receipt);
         return receipt;
+    }
+
+    /**
+     * Which content entries belong to which manifest. One manifest owns every entry (as before). With several, each
+     * manifest owns the entries its own list names (item references, relative or absolute); an entry no manifest names
+     * is reported and not pulled, because pulling it needs a token for a manifest that covers it.
+     */
+    private Map<JsonNode, List<JsonNode>> entriesByManifest(List<JsonNode> manifests, List<JsonNode> contentEntries,
+            List<ArexClient.Finding> findings, List<Receipt.ReceiptObject> objects, Set<String> usedKeys) {
+        Map<JsonNode, List<JsonNode>> groups = new java.util.LinkedHashMap<>();
+        if (manifests.size() == 1) {
+            groups.put(manifests.get(0), contentEntries);
+            return groups;
+        }
+        Set<String> claimed = new HashSet<>();
+        for (JsonNode manifest : manifests) {
+            Set<String> named = ManifestFacts.of(manifest).entries();
+            List<JsonNode> mine = new ArrayList<>();
+            for (JsonNode entry : contentEntries) {
+                String ref = "DocumentReference/" + entry.path("id").asText();
+                if (named.contains(ref)) {
+                    mine.add(entry);
+                    claimed.add(ref);
+                }
+            }
+            if (!mine.isEmpty()) {
+                groups.put(manifest, mine);
+            }
+        }
+        for (JsonNode entry : contentEntries) {
+            if (!claimed.contains("DocumentReference/" + entry.path("id").asText())) {
+                JsonNode att = entry.path("content").path(0).path("attachment");
+                findings.add(new ArexClient.Finding("ENTRY_NOT_IN_A_MANIFEST", "arex-3",
+                        "Content entry '" + entry.path("id").asText() + "' is not listed by any of the payload's " + manifests.size()
+                                + " manifests, so it has no token to pull it with and was not pulled."));
+                objects.add(new Receipt.ReceiptObject(entry.path("id").asText(""), null, att.path("url").asText(null),
+                        att.path("contentType").asText(null), att.path("size").asLong(-1), declaredSha256(att), "not-pulled", 0, null, null, false, null));
+            }
+        }
+        return groups;
     }
 
     /**
@@ -148,11 +209,11 @@ public class ReceiveService {
     // ------------------------------------------------------------------ the pull
 
     private ArexClient.Outcome pullAndRecord(String receiptId, JsonNode manifest, List<JsonNode> contentEntries,
-            List<Receipt.ReceiptObject> objects, List<ArexClient.Finding> findings) {
+            List<Receipt.ReceiptObject> objects, List<ArexClient.Finding> findings, Set<String> usedKeys) {
+        String manifestId = manifest.path("id").asText(null);
         List<ArexClient.ContentRef> refs = new ArrayList<>();
         Map<String, JsonNode> attachments = new HashMap<>();
         Map<String, String> fileKeys = new HashMap<>();
-        Set<String> usedKeys = new HashSet<>();
         for (JsonNode entry : contentEntries) {
             String entryId = entry.path("id").asText("");
             JsonNode att = entry.path("content").path(0).path("attachment");
@@ -161,7 +222,7 @@ public class ReceiveService {
                 findings.add(new ArexClient.Finding("ENTRY_INCOMPLETE", "arex-3, arex-4",
                         "Content entry '" + entryId + "' has no id, no absolute url or no sha-256 digest; it was not pulled."));
                 objects.add(new Receipt.ReceiptObject(entryId, null, att.path("url").asText(null), att.path("contentType").asText(null),
-                        att.path("size").asLong(-1), digest, "incomplete", 0, null, null, false));
+                        att.path("size").asLong(-1), digest, "incomplete", 0, null, null, false, manifestId));
                 continue;
             }
             String key = ReceiptStore.safeEntryName(entryId);
@@ -178,49 +239,55 @@ public class ReceiveService {
                     att.path("size").asLong(-1), digest));
         }
         Map<String, String> sniffed = new HashMap<>();
-        ArexClient.Outcome outcome = arex.pull(manifest.path("id").asText(), manifest, refs, (entryId, bytes, type) -> {
+        ArexClient.Outcome outcome = arex.pull(manifestId, manifest, refs, (entryId, bytes, type) -> {
             store.saveImage(receiptId, fileKeys.get(entryId), bytes);
             sniffed.put(entryId, ImageSniffer.sniff(bytes));
         });
-        findings.addAll(outcome.findings());
+        for (ArexClient.Finding f : outcome.findings()) {
+            if (findings.stream().noneMatch(x -> x.code().equals(f.code()) && x.message().equals(f.message()))) {
+                findings.add(f);
+            }
+        }
         Map<String, ArexClient.ObjectResult> byEntry = new HashMap<>();
         outcome.objects().forEach(r -> byEntry.put(r.entryId(), r));
         for (ArexClient.ContentRef ref : refs) {
             ArexClient.ObjectResult r = byEntry.get(ref.entryId());
             if (r == null) { // the pull stopped before this object
                 objects.add(new Receipt.ReceiptObject(ref.entryId(), fileKeys.get(ref.entryId()), ref.url(), ref.contentType(), ref.size(),
-                        ref.sha256(), "not-pulled", 0, null, null, false));
+                        ref.sha256(), "not-pulled", 0, null, null, false, manifestId));
                 continue;
             }
             String type = sniffed.get(ref.entryId());
             boolean saved = "saved".equals(r.status());
             objects.add(new Receipt.ReceiptObject(ref.entryId(), fileKeys.get(ref.entryId()), ref.url(), ref.contentType(), ref.size(),
-                    ref.sha256(), r.status(), r.bytes(), r.sha256(), saved ? type : null, saved && type != null));
+                    ref.sha256(), r.status(), r.bytes(), r.sha256(), saved ? type : null, saved && type != null, manifestId));
         }
         return outcome;
     }
 
     // ------------------------------------------------------------------ findings about the embedded manifest
 
-    private void inspectEmbedded(JsonNode manifest, List<JsonNode> resources, List<ArexClient.Finding> findings, String ourOrganization) {
+    private void inspectEmbedded(JsonNode manifest, List<JsonNode> resources, List<ArexClient.Finding> findings, String ourOrganization,
+            boolean several) {
         ManifestFacts facts = ManifestFacts.of(manifest);
+        String who = several ? "Manifest " + manifest.path("id").asText() + ": " : "";
         if (facts.expires() != null) {
             try {
                 if (!Instant.parse(facts.expires()).isAfter(clock.instant())) {
                     findings.add(new ArexClient.Finding("MANIFEST_EXPIRED_PER_PAYLOAD", "arex-26",
-                            "The manifest declares an expiry of " + facts.expires() + ", which has passed. The pull is still attempted; the sender decides."));
+                            who + "The manifest declares an expiry of " + facts.expires() + ", which has passed. The pull is still attempted; the sender decides."));
                 }
             } catch (java.time.format.DateTimeParseException e) {
-                findings.add(new ArexClient.Finding("MANIFEST_EXPIRY_UNREADABLE", "arex-30", "The manifest's arex-expires is not a valid instant: " + facts.expires()));
+                findings.add(new ArexClient.Finding("MANIFEST_EXPIRY_UNREADABLE", "arex-30", who + "The manifest's arex-expires is not a valid instant: " + facts.expires()));
             }
         } else {
-            findings.add(new ArexClient.Finding("MANIFEST_EXPIRY_MISSING", "arex-30", "The manifest declares no arex-expires."));
+            findings.add(new ArexClient.Finding("MANIFEST_EXPIRY_MISSING", "arex-30", who + "The manifest declares no arex-expires."));
         }
-        if (facts.requestingOrganization() == null || !facts.requestingOrganization().equals(ourOrganization)) {
+        if (!FhirRefs.same(facts.requestingOrganization(), ourOrganization)) {
             findings.add(new ArexClient.Finding("REQUESTING_ORG_MISMATCH", "arex-25",
-                    "The manifest's requesting organization is '" + facts.requestingOrganization() + "', ours is '" + ourOrganization + "'. The pull is still attempted; the sender decides."));
+                    who + "The manifest's requesting organization is '" + facts.requestingOrganization() + "', ours is '" + ourOrganization + "'. The pull is still attempted; the sender decides."));
         }
-        findings.add(signatureFinding(manifest, resources));
+        findings.add(signatureFinding(manifest, resources, who));
     }
 
     /**
@@ -228,7 +295,7 @@ public class ReceiveService {
      * the canonical form, the key source or the trust anchor. So we say exactly what we saw and never
      * skip it silently.
      */
-    private ArexClient.Finding signatureFinding(JsonNode manifest, List<JsonNode> resources) {
+    private ArexClient.Finding signatureFinding(JsonNode manifest, List<JsonNode> resources, String who) {
         String target = "List/" + manifest.path("id").asText();
         for (JsonNode p : resources) {
             if (!"Provenance".equals(p.path("resourceType").asText()) || !hasProfile(p, "arex-provenance")) {
@@ -236,7 +303,7 @@ public class ReceiveService {
             }
             boolean targetsManifest = false;
             for (JsonNode t : p.path("target")) {
-                targetsManifest |= target.equals(t.path("reference").asText());
+                targetsManifest |= FhirRefs.same(target, t.path("reference").asText());
             }
             if (!targetsManifest) {
                 continue;
@@ -251,12 +318,12 @@ public class ReceiveService {
             boolean compactJws = data.length() > 0 && text.chars().filter(c -> c == '.').count() == 2 && !text.contains(" ");
             if (text.toUpperCase().contains("PLACEHOLDER") || text.isBlank() || !compactJws) {
                 return new ArexClient.Finding("SIGNATURE_PLACEHOLDER", "arex-8",
-                        "The manifest's Provenance signature is empty, a placeholder or not a compact JWS, so it cannot be verified.");
+                        who + "The manifest's Provenance signature is empty, a placeholder or not a compact JWS, so it cannot be verified.");
             }
             return new ArexClient.Finding("SIGNATURE_NOT_VERIFIED", "arex-8",
-                    "A signature is present but was not verified: the draft does not define the canonical form, the key source or the trust anchor.");
+                    who + "A signature is present but was not verified: the draft does not define the canonical form, the key source or the trust anchor.");
         }
-        return new ArexClient.Finding("SIGNATURE_NOT_VERIFIED", "arex-5, arex-8", "No ARex Provenance with a signature targets the manifest.");
+        return new ArexClient.Finding("SIGNATURE_NOT_VERIFIED", "arex-5, arex-8", who + "No ARex Provenance with a signature targets the manifest.");
     }
 
     // ------------------------------------------------------------------ parsing helpers
@@ -273,11 +340,6 @@ public class ReceiveService {
             throw new BadDataException("The body must be a FHIR Bundle of type transaction with at least one entry.");
         }
         return n;
-    }
-
-    private static JsonNode first(List<JsonNode> resources, String type, String profile) {
-        List<JsonNode> found = all(resources, type, profile);
-        return found.isEmpty() ? null : found.get(0);
     }
 
     private static List<JsonNode> all(List<JsonNode> resources, String type, String profile) {

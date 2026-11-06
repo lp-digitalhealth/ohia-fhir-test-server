@@ -145,6 +145,24 @@ const tester = http.createServer((req, res) => {
   const rows2 = await page.locator('#list tr td:nth-child(2)').allInnerTexts();
   check('filtering to UC04a shows no UC07 referral', rows2.every((t) => t === 'UC04a'), JSON.stringify(rows2));
 
+  // ---- a payload with TWO manifests (left by run_uc04a_two_manifests_e2e.py): manifest column and a PDF download
+  await page.selectOption('#filter-usecase', '');
+  await page.waitForFunction(() => document.getElementById('message').textContent.startsWith('Loaded'));
+  const all = await (await page.request.get(FACADE + '/ode/receipts?limit=50', { headers: { Authorization: 'Bearer ' + TOKEN } })).json();
+  const twoAt = all.findIndex((r) => (r.manifestId || '').includes(','));
+  check('a receipt with two manifests exists to open', twoAt >= 0, 'position ' + twoAt);
+  if (twoAt >= 0) {
+    await page.locator('#list tr').nth(twoAt + 1).getByRole('button', { name: 'Open' }).click();
+    await page.waitForFunction(() => document.getElementById('detail').textContent.includes('Other files'));
+    const heads = await page.locator('#detail th').allInnerTexts();
+    check('the table says which manifest each file came from', heads.includes('Manifest'), JSON.stringify(heads));
+    check('the two photos are shown and the PDF is listed as a separate file, not as an image', (await page.locator('#detail img').count()) === 2 && (await page.locator('#detail').innerText()).includes('Download arex-entry-doc-1'));
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: /Download arex-entry-doc-1/ }).click()]);
+    const saved = fs.readFileSync(await download.path());
+    check('the PDF downloads intact with a .pdf name', download.suggestedFilename().endsWith('.pdf') && saved.toString('latin1').startsWith('%PDF-1.4') && saved.length > 20, download.suggestedFilename() + ' ' + saved.length + ' bytes');
+    await page.screenshot({ path: path.join(SHOTS, 'ui-7-two-manifests.png'), fullPage: true });
+  }
+
   check('nothing left the page\'s own origin, and no script error', stray.length === 0 && errors.length === 0, JSON.stringify({ stray, errors }));
   await page.click('#forget');
   check('"Forget token" also empties the send form and the lists', (await page.locator('#send-client option').count()) === 0 && (await page.locator('#sent-list').innerText()).trim() === '' && (await page.locator('#list').innerText()).trim() === '');

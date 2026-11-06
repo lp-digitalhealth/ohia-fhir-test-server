@@ -15,9 +15,11 @@ _no_proxy = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
 class Sender:
-    def __init__(self, port, facade, manifest, photos, client_id="ohia-test-server", token_type="arex-manifest"):
+    def __init__(self, port, facade, manifest, photos, client_id="ohia-test-server", token_type="arex-manifest", content_types=None):
         self.port, self.facade, self.manifest, self.photos = port, facade, manifest, photos
         self.client_id, self.token_type = client_id, token_type
+        self.content_types = content_types or {}   # entry id -> Content-Type to serve it with (default image/jpeg)
+        self.scopes = []                           # the scope parameter of every token request
         self.base = "http://127.0.0.1:%d" % port
         self.token_endpoint = self.base + "/arex/auth/token"
         # switches
@@ -44,6 +46,7 @@ class Sender:
         self.manifest_mode = "current"
         self.photo_overrides = {}
         self.requests.clear()
+        self.scopes.clear()
         self.assertions_verified = 0
         self.assertions_rejected.clear()
         self.tokens.clear()
@@ -123,7 +126,7 @@ class Sender:
                         return self._send(404)
                     if outer.tamper:
                         data = data[:-1] + bytes([data[-1] ^ 1])
-                    return self._send(200, data, "image/jpeg")
+                    return self._send(200, data, outer.content_types.get(entry, "image/jpeg"))
                 self._send(404)
 
             def do_POST(self):
@@ -134,6 +137,7 @@ class Sender:
                 form = dict(p.split("=", 1) for p in body.split("&") if "=" in p)
                 from urllib.parse import unquote_plus
                 form = {k: unquote_plus(v) for k, v in form.items()}
+                outer.scopes.append(form.get("scope"))
                 if outer.refuse_token or form.get("grant_type") != "client_credentials":
                     outer.assertions_rejected.append("refused by switch")
                     return self._send(401, b'{"error":"invalid_client"}')

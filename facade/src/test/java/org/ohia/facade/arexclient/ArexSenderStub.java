@@ -36,6 +36,8 @@ public final class ArexSenderStub {
 
     public final List<String> requests = new CopyOnWriteArrayList<>();
     public final AtomicInteger tokensIssued = new AtomicInteger();
+    /** The scope parameter of every token request we received, in order. */
+    public final List<String> scopesRequested = new CopyOnWriteArrayList<>();
     public final AtomicInteger assertionsRejected = new AtomicInteger();
 
     // switches
@@ -135,6 +137,7 @@ public final class ArexSenderStub {
             send(ex, 401, "application/json", "{\"error\":\"invalid_client\"}".getBytes(StandardCharsets.UTF_8));
             return;
         }
+        scopesRequested.add(form.get("scope"));
         String problem = checkAssertion(form.get("client_assertion"));
         if (problem != null) {
             assertionsRejected.incrementAndGet();
