@@ -36,13 +36,17 @@ The base is taken from the entries' content URLs: everything before `/Binary/`. 
 | Step | Request | Our assumption |
 |---|---|---|
 | Discover | `GET <base>/.well-known/smart-configuration`, else `GET <origin>/.well-known/smart-configuration` | The draft does not say. We read `token_endpoint` and, if present, `authorization_details_types_supported`. |
-| Token | `POST <token_endpoint>`, `grant_type=client_credentials`, `client_assertion_type=...jwt-bearer`, `client_assertion=<RS384 JWT>`, `authorization_details=[{"type":"arex-manifest","manifest":"<manifest id>"}]` | The type defaults to `arex-manifest`; if you advertise another, we use your first. |
+| Token | `POST <token_endpoint>`, `grant_type=client_credentials`, `client_assertion_type=...jwt-bearer`, `client_assertion=<RS384 JWT>`, `scope=system/List.r system/DocumentReference.r system/Provenance.r system/Binary.r`, `authorization_details=[{"type":"arex-manifest","manifest":"<manifest id>"}]`. One token per manifest. | The type defaults to `arex-manifest`; if you advertise another, we use your first. |
 | Published manifest | `GET <base>/List/<manifest id>` with the token | If its `status` is not `current` we **stop** (arex-39). If it is missing we continue and report `PUBLISHED_MANIFEST_UNAVAILABLE`. |
 | Each image | `GET <content url>` with the token, `Accept` the declared type | We verify size and SHA-256; a mismatch is not saved. One new token is requested after a 401. |
 
 Our assertion: `iss` = `sub` = our client id, `aud` = your token endpoint exactly as you advertise it, 2-minute `exp`, a fresh `jti`, header `kid`. A transport error on the token request is retried once with a new assertion.
 
 Every URL must be `https`, on a public address, and on **your ARex base's origin**. We never follow redirects. Limits: 20 objects, 10 MB per object, 50 MB per receipt.
+
+**Several manifests in one payload** (for example one for images and one for a PDF) are supported. Each manifest is pulled on its own: its own token, its own published-manifest check, its own objects. A content entry belongs to the manifest whose list names it (item references may be relative or absolute). Non-image files are saved and offered as a download on the page, never shown inline. If one manifest stops (retracted, token refused), the others are still pulled.
+
+**References may be relative or absolute** (`Organization/x` or `https://your-server/fhir/Organization/x`): the requesting organization and the manifest a Provenance targets are compared by type and id.
 
 ## 4. Register our key with your server
 
@@ -73,6 +77,7 @@ Each finding has a code, a spec reference where one exists, and a sentence. The 
 | `ENTRY_INCOMPLETE`, `ENTRY_ID_SANITIZED` | An entry lacks an id, url or SHA-256 (not pulled), or its id was not a safe file name. |
 | `SUBSCRIPTION_NOT_STORED` | HAPI refused the Subscription; the rest was stored (plan item O9). |
 | `HOST_NOT_FOUND` | The host name in your content URLs does not resolve (for example the sample's `meridian-teledental.example.org`). Nothing was contacted. |
+| `ENTRY_NOT_IN_A_MANIFEST` | The payload has several manifests and none lists this content entry, so there is no token to pull it with. It was not pulled. |
 | `UNSAFE_URL_REFUSED` | A URL was not https, not public, not on your base's origin, or not under your base. |
 | `TOKEN_ENDPOINT_NOT_DISCOVERED`, `AUTHORIZATION_DETAILS_TYPE_ADJUSTED` | A discovery or token-request assumption did not hold. |
 | `TOKEN_REFUSED` | You refused our token. The pull stops. |

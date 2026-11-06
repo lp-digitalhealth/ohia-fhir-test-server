@@ -11,6 +11,7 @@ import org.ohia.facade.arexclient.ArexClient;
  * @param accepted     the payload was stored in HAPI exactly as received
  * @param hapiEntries  how many entries the stored transaction had
  * @param stoppedBecause why the pull stopped early, or null
+ * @param manifestId   the manifest id; when a payload carries several, their ids joined with ", "
  * @param sender       the sender's ARex base derived from the content URLs, or null
  */
 public record Receipt(String id, Instant receivedAt, String referralId, String manifestId, boolean accepted,
@@ -38,6 +39,14 @@ public record Receipt(String id, Instant receivedAt, String referralId, String m
      * is true only for a saved object whose BYTES are a JPEG or PNG; never by the declared type.
      */
     public record ReceiptObject(String entryId, String fileKey, String url, String declaredContentType, long declaredSize,
-            String declaredSha256, String status, long bytes, String sha256, String sniffedType, boolean viewable) {
+            String declaredSha256, String status, long bytes, String sha256, String sniffedType, boolean viewable,
+            String manifestId) {
+
+        /** An object with no manifest named (receipts written before a payload could carry several). */
+        public ReceiptObject(String entryId, String fileKey, String url, String declaredContentType, long declaredSize,
+                String declaredSha256, String status, long bytes, String sha256, String sniffedType, boolean viewable) {
+            this(entryId, fileKey, url, declaredContentType, declaredSize, declaredSha256, status, bytes, sha256, sniffedType,
+                    viewable, null);
+        }
     }
 }
