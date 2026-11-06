@@ -3,6 +3,9 @@
     {
       "clientId": "tester-example",
       "requestingOrganization": "Organization/org-restorative-dental-tx",
+      "organizationsByUseCase": {
+        "uc04a": "Organization/org-barton-springs-dental"
+      },
       "allowedTargetPrefixes": [
         "https://tester.example.org/fhir"
       ],

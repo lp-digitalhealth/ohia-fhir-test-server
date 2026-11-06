@@ -16,7 +16,8 @@ curl -X POST "https://<server>/ode/receive/uc04a" \
 ```
 
 - The body is the UC04a interaction 1 **transaction Bundle**, with the ARex manifest embedded: a manifest `List` (profile `arex-manifest`), one `DocumentReference` per image (profile `arex-content-entry`) and the manifest `Provenance`. Maximum 10 MB (413 above that).
-- Not a transaction Bundle: **422**, nothing stored. HAPI refuses it for a reason we cannot work around: **502**, no pull.
+- Not a transaction Bundle: **422**, nothing stored. HAPI refuses it for a reason we cannot work around: **502**, no pull; the reply's `"error"` line says why.
+- **References inside the Bundle.** Write them as ordinary relative references (`Patient/patient-sarah-okonkwo`), or as full addresses under `https://<server>/fhir/`. If your app was given `.../ode/receive/uc04a` as a "FHIR base" and wrote full addresses under that, they are accepted too (they are declared as ours). A reference to any other server is refused with `HAPI-0507` and a 502.
 - Otherwise **200** with a **receipt** (JSON). A failed pull is a result, not an error: read `findings` and `objects`.
 
 The shared token is the same interim token as the rest of the server (plan item S1).
@@ -71,6 +72,7 @@ Each finding has a code, a spec reference where one exists, and a sentence. The 
 | `NO_AREX_MANIFEST` | No manifest with entries; stored, nothing to pull. |
 | `ENTRY_INCOMPLETE`, `ENTRY_ID_SANITIZED` | An entry lacks an id, url or SHA-256 (not pulled), or its id was not a safe file name. |
 | `SUBSCRIPTION_NOT_STORED` | HAPI refused the Subscription; the rest was stored (plan item O9). |
+| `HOST_NOT_FOUND` | The host name in your content URLs does not resolve (for example the sample's `meridian-teledental.example.org`). Nothing was contacted. |
 | `UNSAFE_URL_REFUSED` | A URL was not https, not public, not on your base's origin, or not under your base. |
 | `TOKEN_ENDPOINT_NOT_DISCOVERED`, `AUTHORIZATION_DETAILS_TYPE_ADJUSTED` | A discovery or token-request assumption did not hold. |
 | `TOKEN_REFUSED` | You refused our token. The pull stops. |

@@ -11,8 +11,8 @@ import org.springframework.stereotype.Component;
 /**
  * The entitlement check, used both when a token is requested and on every retrieval.
  * A caller is entitled to a manifest only if ALL of these hold right now:
- * the manifest exists; it was published for this very client; the client's registered
- * organization is the manifest's requesting organization (authenticating is not authorizing);
+ * the manifest exists; it was published for this very client; an organization the client is registered as
+ * is the manifest's requesting organization (authenticating is not authorizing);
  * the manifest has not expired; and it has not been retracted. Expiry is checked here, at use,
  * so an unexpired token cannot outlive its manifest.
  */
@@ -40,7 +40,7 @@ public class ArexAccess {
             return Optional.empty();
         }
         Optional<ClientEntry> client = registry.find(clientId);
-        if (client.isEmpty() || !client.get().requestingOrganization().equals(m.requestingOrganization())) {
+        if (client.isEmpty() || !client.get().plays(m.requestingOrganization())) {
             return Optional.empty();
         }
         return Optional.of(m);

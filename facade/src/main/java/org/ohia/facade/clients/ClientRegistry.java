@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import org.ohia.facade.common.BadDataException;
+import org.ohia.facade.common.UseCase;
 import org.ohia.facade.config.FacadeProperties;
 import org.springframework.stereotype.Component;
 
@@ -43,6 +44,12 @@ public class ClientRegistry {
     public synchronized Optional<ClientEntry> find(String clientId) {
         refreshIfChanged();
         return Optional.ofNullable(entries.get(clientId));
+    }
+
+    /** Every registered tester, by client id. Callers must not hand the public keys out. */
+    public synchronized List<ClientEntry> all() {
+        refreshIfChanged();
+        return entries.values().stream().sorted(java.util.Comparator.comparing(ClientEntry::clientId)).toList();
     }
 
     private void refreshIfChanged() {
@@ -82,7 +89,15 @@ public class ClientRegistry {
                 }
                 prefixes.add(prefix);
             }
-            if (parsed.put(id, new ClientEntry(id, org, List.copyOf(prefixes), c.path("jwks"))) != null) {
+            Map<String, String> perUseCase = new HashMap<>();
+            c.path("organizationsByUseCase").fields().forEachRemaining(f -> {
+                String useCase = UseCase.parse(f.getKey()).id();
+                if (!ORG_REF.matcher(f.getValue().asText("")).matches()) {
+                    throw new BadDataException("Registry: client " + id + " organizationsByUseCase." + f.getKey() + " needs a value like Organization/<id>.");
+                }
+                perUseCase.put(useCase, f.getValue().asText());
+            });
+            if (parsed.put(id, new ClientEntry(id, org, List.copyOf(prefixes), c.path("jwks"), Map.copyOf(perUseCase))) != null) {
                 throw new BadDataException("Registry: duplicate clientId " + id + ".");
             }
         }

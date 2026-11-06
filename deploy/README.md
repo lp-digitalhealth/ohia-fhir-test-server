@@ -84,7 +84,8 @@ A Java service in `../facade` runs beside HAPI and is routed by Caddy at `/ode/*
 ```bash
 git pull
 docker compose build facade      # builds the Java image on the VM (first build downloads Maven dependencies)
-docker compose up -d             # starts the facade and reloads Caddy's routes; HAPI and the database are not recreated
+docker compose up -d             # starts the new facade; HAPI and the database are not recreated
+docker compose up -d --force-recreate caddy   # only when deploy/Caddyfile changed (see the note below)
 docker compose ps                # facade should become healthy
 ```
 
@@ -108,8 +109,24 @@ curl -s -H "Authorization: Bearer $TOKEN" $BASE/ode/sends                       
 
 The facade also receives UC04a interaction 1 and pulls its images with ARex (plan items S6 and S7). Testers send to `POST /ode/receive/uc04a`; the guide for them is `docs/UC04A_SENDING_GUIDE.md`.
 
-- **Roll out:** same steps as section 8 (`git pull`, `docker compose build facade`, `docker compose up -d`). The Caddyfile has a new open route for `/viewer/*`; `docker compose up -d` reloads it. The facade creates its own key on first use in the `facade_data` volume (`keys/server-key.json`); keep that volume or the key changes.
+- **Roll out:** same steps as section 8 (`git pull`, `docker compose build facade`, `docker compose up -d`). The Caddyfile has a new open route for `/viewer/*`; Caddy does NOT pick that up from `docker compose up -d` or `caddy reload` (see the next point). The facade creates its own key on first use in the `facade_data` volume (`keys/server-key.json`); keep that volume or the key changes.
+- **When `deploy/Caddyfile` changes, recreate Caddy: `docker compose up -d --force-recreate caddy`.** Observed on the live VM (2026-11-05): `git pull` replaces the file, but the Caddy container keeps the old copy mounted, so `caddy reload` re-read the old file (`docker compose exec caddy grep -c viewer /etc/caddy/Caddyfile` printed 0 while the same grep on the host printed 2) and `/viewer/` and `/arex/jwks.json` still returned 401. Recreating the container fixed it (they then returned 200). The certificate is kept in the `caddy_data` volume; HAPI and the database are not touched.
 - **Give a tester our identity:** `curl -s -H "Authorization: Bearer $TOKEN" $BASE/ode/identity`. The public key is open at `$BASE/arex/jwks.json`.
 - **See results:** open `$BASE/viewer/` and type the shared token, or `curl -s -H "Authorization: Bearer $TOKEN" $BASE/ode/receipts`.
 - **Tested in the sandbox:** 161 automated tests; an end-to-end run against real HAPI 8.12.0 with the real UC04a data and an independent Python sender (21 checks, all three payload variants); a Chromium check of the viewer (18 checks).
-- **Not tested:** the live VM and certificate, `/viewer/` and `/arex/jwks.json` through the live Caddy (the Caddyfile change is exercised only by reading it), and any real tester's ARex server.
+- **Observed on the live VM (2026-11-05):** the facade built and was healthy; after recreating Caddy, `/viewer/` and `/arex/jwks.json` returned 200 and `/ode/identity` without a token returned 401. **Not tested:** a UC04a payload received on the live server, and any real tester's ARex server.
+
+## 10. Sending UC04a and receiving UC07 from the page
+
+Plan items S8 to S10. After the usual update (`git pull`, `docker compose build facade`, `docker compose up -d`; recreate Caddy only if the Caddyfile changed, see section 9):
+
+1. Register each tester for UC04a: in `facade/config/clients.json` add `"organizationsByUseCase": {"uc04a": "Organization/org-barton-springs-dental"}` to the tester's entry (see `facade/config/clients.example.json`). No restart is needed.
+2. Open `/viewer/`, enter the token, go to **Send a referral**, choose UC04a, click **Load the data** once, pick the tester, check the address, click **Send referral** and confirm.
+3. Testers send you a UC07 referral with `POST /ode/receive/uc07` (same token as UC04a). It appears on the **Received** tab; filter by use case.
+
+- **A tester gets a 502 on the receive endpoint:** read the reply's `"error"` text and `docker compose logs --since 30m -t hapi`. `HAPI-0507 ... external reference` means their Bundle's references point at an address that is not ours; `docker-compose.yml` declares our own addresses as local (`HAPI_FHIR_LOCAL_BASE_URLS_*`), so after `docker compose up -d` (this recreates HAPI) only references to other servers are refused.
+- **Capability statement:** `GET /fhir/metadata` is now the facade's statement of the target capability (open, no token). This changes the Caddyfile, so after `git pull` and the facade rebuild run `docker compose up -d --force-recreate caddy` (see section 9), then check `curl -s https://<your-hostname>/fhir/metadata | head -c 300`: it should say `OHIA FHIR test server (November testing): target capability`. If the facade is down, Caddy answers with HAPI's own statement instead.
+- **Images:** click any image on the page to open the viewer (next/previous, actual size, checksum). The Send tab previews what will go out; the Sent tab has an Images link per send.
+- **Tested in the sandbox:** 179 automated tests; end-to-end against real HAPI 8.12.0 for UC04a receive (21 checks) and UC07 receive (8 checks) with an independent Python sender; a Chromium check of the new tabs (18 checks), including sending to a stand-in tester.
+- **Not tested:** the live VM with these changes, and any real tester receiving a UC04a referral or pulling its photos from this server.
+

@@ -5,6 +5,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import org.ohia.facade.common.ForbiddenTargetException;
+import org.ohia.facade.common.UnresolvableTargetException;
 import org.ohia.facade.config.FacadeProperties;
 import org.springframework.stereotype.Component;
 
@@ -53,7 +54,7 @@ public class SsrfGuard {
         try {
             addresses = InetAddress.getAllByName(host);
         } catch (UnknownHostException e) {
-            throw new ForbiddenTargetException("The target host cannot be resolved: " + host);
+            throw new UnresolvableTargetException("The target host cannot be resolved: " + host);
         }
         if (!allowPrivate) {
             for (InetAddress a : addresses) {

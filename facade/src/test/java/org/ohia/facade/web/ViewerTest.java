@@ -35,7 +35,7 @@ class ViewerTest {
     @Test
     void thePageLoadsWithoutATokenAndHoldsNoData() throws Exception {
         String html = page("/viewer/index.html");
-        assertTrue(html.contains("<title>Received payloads</title>"));
+        assertTrue(html.contains("<title>OHIA test server</title>"));
         assertFalse(html.contains("unit-test-token-123"), "the page must never contain the token");
         assertFalse(html.contains("REF-"), "the page itself must hold no referral ids");
         assertFalse(Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}").matcher(html).find(), "no receipt ids");
@@ -98,6 +98,23 @@ class ViewerTest {
         }
         assertTrue(source.contains("textContent"), "text must be inserted with textContent");
         assertFalse(Pattern.compile("\\.setAttribute\\(\\s*['\"]on", Pattern.CASE_INSENSITIVE).matcher(source).find());
+    }
+
+    /** The send form must ask the person before anything leaves this server, and must not keep the tester's token. */
+    @Test
+    void theSendFormConfirmsBeforeSendingAndClearsTheTestersToken() throws Exception {
+        String html = page("/viewer/index.html");
+        for (String id : new String[] {"tab-received", "tab-send", "tab-sent", "filter-usecase", "send-usecase", "send-client", "send-target", "send-bearer",
+                "send-button", "seed-button", "sent-list"}) {
+            assertTrue(html.contains("id=\"" + id + "\""), "the page needs #" + id);
+        }
+        assertTrue(Pattern.compile("id=\"send-bearer\"[^>]*type=\"password\"").matcher(html).find(), "the tester's token is a password field");
+        String source = page("/viewer/viewer.js");
+        int confirm = source.indexOf("window.confirm(");
+        int post = source.indexOf("apiPost('/ode/send'");
+        assertTrue(confirm > 0 && post > confirm, "the person must confirm before the send request is made");
+        assertTrue(source.contains("$('send-bearer').value = ''"), "the tester's token must be cleared after every send");
+        assertFalse(source.contains("sessionStorage.setItem('ohiaSend") || source.contains("localStorage"), "the tester's token must never be stored");
     }
 
     @Test

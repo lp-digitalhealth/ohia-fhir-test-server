@@ -21,6 +21,11 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class UcStubs {
 
     public static final String REF = "testref";
+    /** UC04a is served from its own pinned ref and path, like the real data repository. */
+    public static final String UC04A_REF = "uc04aref";
+    public static final String UC04A_PKG = "2026-CMS-Connectathon/fhir-resources/purpose-built/uc04a-teledentistry-commercial/interactions/interaction-01";
+    /** When true, one UC04a photo is served with a flipped byte so its digest no longer matches. */
+    public static volatile boolean tamperUc04a;
     public static final String PKG = "2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-01";
     public static final ObjectMapper M = new ObjectMapper();
 
@@ -65,12 +70,21 @@ public final class UcStubs {
         posts.set(0);
         lastPost.set(null);
         tamper = false;
+        tamperUc04a = false;
         postStatus = 200;
         refuseSubscriptions = false;
     }
 
     public static byte[] fixtureBytes(String name) {
         try (var in = UcStubs.class.getResourceAsStream("/uc07-i1/" + name)) {
+            return in == null ? null : in.readAllBytes();
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    public static byte[] uc04aBytes(String name) {
+        try (var in = UcStubs.class.getResourceAsStream("/uc04a-i1/" + name)) {
             return in == null ? null : in.readAllBytes();
         } catch (IOException e) {
             throw new IllegalStateException(e);
@@ -85,7 +99,16 @@ public final class UcStubs {
         String path = ex.getRequestURI().getPath();
         String prefix = "/" + REF + "/" + PKG + "/";
         byte[] body = null;
-        if (path.startsWith(prefix)) {
+        String uc04aPrefix = "/" + UC04A_REF + "/" + UC04A_PKG + "/";
+        if (path.startsWith(uc04aPrefix)) {
+            String rest = path.substring(uc04aPrefix.length());
+            String name = rest.equals("interaction-01-bundle.json") ? rest : rest.startsWith("arex-payloads/intraoral-photo-") ? rest.substring("arex-payloads/".length()) : null;
+            body = name == null ? null : uc04aBytes(name);
+            if (body != null && tamperUc04a && name.equals("intraoral-photo-1.jpg")) {
+                body = body.clone();
+                body[body.length - 1] ^= 0x01;
+            }
+        } else if (path.startsWith(prefix)) {
             String rest = path.substring(prefix.length());
             if (rest.equals("interaction-01-bundle.json")) {
                 body = fixtureBytes("interaction-01-bundle.json");

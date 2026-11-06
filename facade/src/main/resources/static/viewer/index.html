@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Received payloads</title>
+  <title>OHIA test server</title>
   <link rel="stylesheet" href="viewer.css">
 </head>
 <body>
   <header class="top">
-    <h1>Received payloads</h1>
-    <p class="sub">UC04a referrals this server received, and the images it pulled with ARex.</p>
+    <h1>OHIA test server</h1>
+    <p class="sub">Referrals this server received (UC04a and UC07) and the images it pulled with ARex, and referrals it sends to testers.</p>
   </header>
 
   <section class="card" aria-labelledby="auth-h">
@@ -24,18 +24,100 @@
     <p id="message" class="message" role="status" aria-live="polite"></p>
   </section>
 
-  <main>
-    <section class="card" aria-labelledby="list-h">
-      <h2 id="list-h">Receipts</h2>
-      <p><button type="button" id="refresh" class="secondary">Refresh</button></p>
-      <div id="list" class="scroll"></div>
-    </section>
+  <nav class="tabs" aria-label="Sections">
+    <button type="button" id="tab-received" class="tab" aria-pressed="true">Received</button>
+    <button type="button" id="tab-send" class="tab" aria-pressed="false">Send a referral</button>
+    <button type="button" id="tab-sent" class="tab" aria-pressed="false">Sent</button>
+  </nav>
 
-    <section class="card" id="detail-card" aria-labelledby="detail-h" hidden>
-      <h2 id="detail-h">Receipt</h2>
-      <div id="detail"></div>
-    </section>
+  <main>
+    <div id="view-received">
+      <section class="card" aria-labelledby="list-h">
+        <h2 id="list-h">Received</h2>
+        <p class="note">What testers sent to this server. Open a row to see the findings, the images and how the pull went.</p>
+        <p class="row">
+          <label for="filter-usecase">Show</label>
+          <select id="filter-usecase">
+            <option value="">All referrals</option>
+            <option value="uc04a">UC04a (teledentistry)</option>
+            <option value="uc07">UC07 (root canal)</option>
+          </select>
+          <button type="button" id="refresh" class="secondary">Refresh</button>
+        </p>
+        <div id="list" class="scroll"></div>
+      </section>
+
+      <section class="card" id="detail-card" aria-labelledby="detail-h" hidden>
+        <h2 id="detail-h">Receipt</h2>
+        <div id="detail"></div>
+      </section>
+    </div>
+
+    <div id="view-send" hidden>
+      <section class="card" aria-labelledby="send-h">
+        <h2 id="send-h">Send a referral to a tester</h2>
+        <p class="note">This server plays the sender. The tester receives the referral and pulls its images from this server over ARex, using the key they registered. Pick the use case and the tester, then check the address before you send.</p>
+        <p class="row">
+          <label for="send-usecase">Use case</label>
+          <select id="send-usecase">
+            <option value="uc04a">UC04a: teledentistry referral with two intraoral photos</option>
+            <option value="uc07">UC07: root-canal referral with radiographs</option>
+          </select>
+        </p>
+        <p class="row">
+          <span id="seed-status" class="muted"></span>
+          <button type="button" id="seed-button" class="secondary">Load the data</button>
+        </p>
+        <form id="send-form" autocomplete="off">
+          <p class="field"><label for="send-client">Tester</label>
+            <select id="send-client"></select></p>
+          <p class="field"><label for="send-target">Send to (their FHIR address)</label>
+            <input id="send-target" type="text" spellcheck="false" autocomplete="off"></p>
+          <p class="field"><label for="send-bearer">Their access token (optional)</label>
+            <input id="send-bearer" type="password" spellcheck="false" autocomplete="off"></p>
+          <p class="note">The tester's token is used for this one send. It is not stored or logged.</p>
+          <p><button type="submit" id="send-button">Send referral</button></p>
+        </form>
+        <p id="send-message" class="message" role="status" aria-live="polite"></p>
+        <div id="send-result"></div>
+      </section>
+
+      <section class="card" aria-labelledby="preview-h">
+        <h2 id="preview-h">Images this referral will carry</h2>
+        <p class="note">These are the images the tester will be able to pull from this server. Click one to enlarge it.</p>
+        <div id="send-preview"></div>
+      </section>
+    </div>
+
+    <div id="view-sent" hidden>
+      <section class="card" aria-labelledby="sent-h">
+        <h2 id="sent-h">Sent</h2>
+        <p class="note">Referrals this server sent, newest first.</p>
+        <p><button type="button" id="refresh-sent" class="secondary">Refresh</button></p>
+        <div id="sent-list" class="scroll"></div>
+      </section>
+
+      <section class="card" id="sent-detail-card" aria-labelledby="sent-detail-h" hidden>
+        <h2 id="sent-detail-h">Images sent</h2>
+        <div id="sent-detail"></div>
+      </section>
+    </div>
   </main>
+
+  <div id="lightbox" class="lightbox" role="dialog" aria-modal="true" aria-labelledby="lightbox-title" hidden>
+    <div class="lightbox-box">
+      <p id="lightbox-title" class="lightbox-title"></p>
+      <div id="lightbox-stage" class="lightbox-stage"><img id="lightbox-img" alt=""></div>
+      <p id="lightbox-meta" class="lightbox-meta mono"></p>
+      <p class="row">
+        <button type="button" id="lightbox-prev" class="secondary">Previous</button>
+        <button type="button" id="lightbox-next" class="secondary">Next</button>
+        <button type="button" id="lightbox-zoom" class="secondary">Actual size</button>
+        <button type="button" id="lightbox-close">Close</button>
+        <span id="lightbox-count" class="muted"></span>
+      </p>
+    </div>
+  </div>
 
   <script src="viewer.js"></script>
 </body>
