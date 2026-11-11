@@ -43,3 +43,19 @@ facade:
     max-total-bytes: 50000000
     connect-timeout-seconds: 5
     read-timeout-seconds: 60
+  patient-access:
+    # The payer-side resources (CARIN Blue Button 2.2.0) served to patient apps at /patient-access/fhir. Loaded by
+    # POST /ode/admin/seed-patient-access from a PINNED commit of the data repository (UC07 interaction 6), never a
+    # moving branch. Bump the ref deliberately when the data changes.
+    data-base-url: ${FACADE_PATIENT_ACCESS_DATA_BASE_URL:https://raw.githubusercontent.com/lp-digitalhealth/ohia-test-data}
+    data-ref: ${FACADE_PATIENT_ACCESS_DATA_REF:1bb07a826e546391e777bae31394951be8434f04}
+    files:
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-06/patient-joe-castle-payer.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-06/coverage-joe-castle-dentaquest-payer.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-06/org-dentaquest-tx-payer.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-06/org-pediatric-dental-tx-payer.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-06/org-restorative-dental-tx-payer.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-06/pract-mary-parker-payer.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-06/pract-max-garcia-payer.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-06/eob-pediatric-evaluation-c4bb-oral.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-06/eob-restorative-treatment-c4bb-oral.json

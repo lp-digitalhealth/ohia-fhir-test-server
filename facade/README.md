@@ -75,6 +75,18 @@ Docker (as the compose file does it): `docker compose build facade`.
 - **Several manifests, scope, absolute references:** a received payload may carry several ARex manifests; each is pulled with its own token (`scope` defaults to `system/List.r system/DocumentReference.r system/Provenance.r system/Binary.r`, override with `facade.arex.scope` / `FACADE_AREX_SCOPE`). References to the requesting organization and to the manifest a Provenance targets are compared by type and id, so relative and absolute forms match. Non-image files are offered as downloads on the page.
 - **Known limit:** received payloads and the data we send from share one HAPI. A tester who sends us the sample referral under the same resource ids overwrites our copy of it. Use "Load the data" (or `POST /ode/admin/seed?useCase=...`) before sending to restore it.
 
+## Patient-app base (UC07 interaction 6)
+
+`/patient-access/fhir` is a second FHIR base, separate from `/fhir`, for patient-facing apps. It serves the payer's CARIN Blue Button 2.2.0 view of the UC07 member: `Patient`, `Coverage`, `Organization`, `Practitioner` and `ExplanationOfBenefit`, each with read (`GET /{type}/{id}`) and search (`GET /{type}`) only. Nothing can be written.
+
+- **Load the data:** `POST /ode/admin/seed-patient-access` fetches the nine interaction-06 files from `ohia-test-data` at the commit pinned in `facade.patient-access.data-ref`, checks them (allowed types, Blue Button `|2.2.0` profile, `meta.lastUpdated`, no duplicate ids, a Patient present, every reference a `Type/id` inside the set) and replaces the stored set only if all pass. Until then a read is 404 and a search is an empty Bundle that says nothing is loaded. To change the data, change the pin.
+- **Find the member:** `Patient?identifier=<system>|<value>` with the payer online member ID or the Medicaid beneficiary ID, then `Coverage?beneficiary=`, `ExplanationOfBenefit?patient=`.
+- **Search parameters:** the Blue Button CapabilityStatement set (EOB: `_id, patient, _lastUpdated, type, identifier, service-date, service-start-date, billable-period-start`; the other types `_id, _lastUpdated`) plus `identifier` on all five types, `status`, and Coverage `beneficiary`/`patient`. Dates take `eq, gt, ge, lt, le`. A comma is OR, a repeat is AND. `_count` is 0 to 100, `_format` accepts JSON only. Anything else is a 400 OperationOutcome, never a silent empty result.
+- **Access:** the interim shared bearer token, enforced in Caddy and again in the facade (`PatientAccessTokenFilter`). `GET /patient-access/fhir/metadata` and CORS preflights are open. Browser apps are allowed from any origin.
+- **CapabilityStatement:** `/patient-access/fhir/metadata`, from `src/main/resources/capability/patient-access-capability-statement.json`. It lists what is not implemented.
+- **Not implemented:** SMART login, `vread`, `_include`/`_revinclude`, paging beyond `_count`, guardian or proxy access, any write.
+- **Not checked:** the HL7 validator has not been run on the data, and the Caddy routes have not been run.
+
 ## Known limits
 
 - Data stores are plain files on the `facade_data` volume; access tokens and replay records are in memory, so a restart ends outstanding tokens.

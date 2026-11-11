@@ -50,6 +50,9 @@ This document is for coding assistants to put the current state of the repo
 - **Not built:** UC07 interactions 2 and 4, an automatic way to register testers, and token issuing for `/fhir`.
 - **Rollout (manual, owner):** `git pull`, `docker compose build facade`, `docker compose up -d`, then register a tester in `facade/config/clients.json` and seed (see `deploy/README.md` section 8).
 
+## Patient-app base (UC07 interaction 6; `facade/`)
+`/patient-access/fhir` serves CARIN Blue Button 2.2.0 `Patient`, `Coverage`, `Organization`, `Practitioner` and `ExplanationOfBenefit` for patient-facing apps (read and search only). Load it with `POST /ode/admin/seed-patient-access`; it takes the interaction-06 files from `ohia-test-data` at a pinned commit. Found by the payer online member ID. Shared token for now. Detail: `facade/README.md`, section "Patient-app base". **Verified:** the full facade suite (233 tests), the real jar against the real data at the pinned commit on this machine (seed, lookups, refusals, data kept across a restart). **Not verified:** the HL7 validator on the data, the Caddy routes, a deployed VM. A write attempt answers 405 in Spring's default JSON, not a FHIR OperationOutcome.
+
 ## For testers
 `docs/CONSUMER_GUIDE.md` explains how to connect. `docs/AREX_RETRIEVAL_GUIDE.md` (with the tested script `docs/examples/arex_fetch.py`) explains how to retrieve the referral's images. `docs/FACADE_BUILD_GUIDE.md` explains how the facade was built, step by step, for anyone who wants to reproduce or adapt it.
 
