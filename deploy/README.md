@@ -130,3 +130,19 @@ Plan items S8 to S10. After the usual update (`git pull`, `docker compose build 
 - **Tested in the sandbox:** 179 automated tests; end-to-end against real HAPI 8.12.0 for UC04a receive (21 checks) and UC07 receive (8 checks) with an independent Python sender; a Chromium check of the new tabs (18 checks), including sending to a stand-in tester.
 - **Not tested:** the live VM with these changes, and any real tester receiving a UC04a referral or pulling its photos from this server.
 
+
+## 10. Oral EOBs under /fhir
+
+`GET /fhir/ExplanationOfBenefit` (read and search) is answered by the facade, not HAPI; see `facade/README.md`. Roll it out like section 8:
+
+```bash
+git pull
+docker compose build facade
+docker compose up -d             # reloads Caddy's routes and starts the new facade; HAPI and the database are not recreated
+curl -s -X POST -H "Authorization: Bearer $TOKEN" $BASE/ode/admin/seed-eob     # once: load the five oral EOBs
+curl -s -H "Authorization: Bearer $TOKEN" "$BASE/fhir/ExplanationOfBenefit?patient=Patient/patient-sarah-okonkwo"   # expect total 2
+```
+
+- If the facade is down, only the `ExplanationOfBenefit` paths return 502; the rest of `/fhir` is unaffected.
+- A `POST` of an ExplanationOfBenefit to `/fhir` is now refused (405) instead of being stored in HAPI.
+- **Not tested:** the Caddy change itself (the new `@eob` route) has not been run; there was no Docker here and a downloaded Caddy binary was not allowed to run. Check the `curl` lines above, and `docker compose logs caddy` if the container does not start.

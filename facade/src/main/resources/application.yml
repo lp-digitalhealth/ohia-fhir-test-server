@@ -25,6 +25,18 @@ facade:
     receiving:
       # The organization we play when a tester sends US a UC07 referral (the receiving specialist).
       uc07-requesting-organization: ${FACADE_UC07_RECEIVER_ORG:Organization/org-restorative-dental-tx}
+  eob:
+    # Oral claims-sharing ExplanationOfBenefit resources (the ODE oral profile, ode-dental-claim, derived from CARIN
+    # Blue Button), served read-only at GET /fhir/ExplanationOfBenefit. Loaded by POST /ode/admin/seed-eob from a PINNED
+    # commit of the data repository, never a moving branch. Bump the ref deliberately when the data changes.
+    data-base-url: ${FACADE_EOB_DATA_BASE_URL:https://raw.githubusercontent.com/lp-digitalhealth/ohia-test-data}
+    data-ref: ${FACADE_EOB_DATA_REF:6b84bb22769ac46d257d01def87f413b63895dac}
+    files:
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc02a-surgical-extraction/interactions/interaction-05/eob-d7210-claims-sharing.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc02b-commercial-implant/interactions/interaction-05/eob-extraction-implant-claims-sharing.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc03-pediatric-referral/interactions/interaction-05/eob-timothy-dental-claims-sharing.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc04a-teledentistry-commercial/interactions/interaction-05/eob-inoffice-claims-sharing.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc04a-teledentistry-commercial/interactions/interaction-05/eob-teledentistry-claims-sharing.json
   send:
     # Both flags below exist for automated tests only and must stay false in a deployment.
     allow-http: false

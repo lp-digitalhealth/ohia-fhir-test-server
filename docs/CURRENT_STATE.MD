@@ -50,6 +50,13 @@ This document is for coding assistants to put the current state of the repo
 - **Not built:** UC07 interactions 2 and 4, an automatic way to register testers, and token issuing for `/fhir`.
 - **Rollout (manual, owner):** `git pull`, `docker compose build facade`, `docker compose up -d`, then register a tester in `facade/config/clients.json` and seed (see `deploy/README.md` section 8).
 
+## Oral EOB read and search (`facade/`, branch `feature/oral-eob-endpoint`, not merged or deployed)
+- **In the repo:** `GET /fhir/ExplanationOfBenefit[/{id}]` serves the five oral claims-sharing EOBs (UC02a, UC02b, UC03, UC04a x2), loaded by `POST /ode/admin/seed-eob` from data-repo commit `6b84bb2`. Read-only. New Caddy route `@eob` sends it to the facade; `OdeTokenFilter` also guards it. The capability statement lists it as read and search-type with the data's profile address. Details: `facade/README.md`.
+- **VERIFIED:** 223 automated tests pass (30 new). Each new rule was broken on purpose and the matching test failed (token filter on the path, patient id forms, profile check, claim-type check, unsupported parameters). The real jar was run locally, loaded the real five files from GitHub at the pinned commit, answered read and search, refused with 401, 405 and 400 as designed, and kept the data across a restart.
+- **UNVERIFIED:** the Caddy `@eob` route (no Docker, and the Caddy binary could not be run), anything on the VM, and a real client's use of the endpoint.
+- **KNOWN CONFLICT (owner decision):** the ODE IG (`ode-ig`) removed its EOB profile on purpose ("No CARIN Blue Button"; plan: `Claim` submission with `$submit`). The data repository still declares `ode-dental-claim`, and nothing publishes a StructureDefinition for it. This endpoint serves the existing data anyway, as the owner asked, and validates nothing against the profile.
+- **Not built:** a StructureDefinition for the profile, profile validation, paging beyond `_count`, `_include` of the referenced Patient, Organization and Coverage, and the UC05 and UC01 EOBs (a different shape).
+
 ## For testers
 `docs/CONSUMER_GUIDE.md` explains how to connect. `docs/AREX_RETRIEVAL_GUIDE.md` (with the tested script `docs/examples/arex_fetch.py`) explains how to retrieve the referral's images. `docs/FACADE_BUILD_GUIDE.md` explains how the facade was built, step by step, for anyone who wants to reproduce or adapt it.
 

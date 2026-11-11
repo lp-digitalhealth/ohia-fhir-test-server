@@ -103,4 +103,26 @@ class CapabilityStatementTest {
         assertTrue(cs.at("/rest/0/security/description").asText().contains("shared token"));
         assertTrue(cs.at("/rest/0/security/description").asText().contains("does not accept FHIR calls"));
     }
+
+    /** The oral EOBs are read-only: the statement must not promise create or update, and must name the data's profile and its search parameters. */
+    @Test
+    void declaresTheOralEobAsReadAndSearchOnlyWithItsProfile() {
+        JsonNode eob = null;
+        for (JsonNode r : cs.at("/rest/0/resource")) {
+            if ("ExplanationOfBenefit".equals(r.get("type").asText())) {
+                eob = r;
+            }
+        }
+        assertTrue(eob != null, "ExplanationOfBenefit is declared");
+        Set<String> interactions = new HashSet<>();
+        eob.get("interaction").forEach(i -> interactions.add(i.get("code").asText()));
+        assertEquals(Set.of("read", "search-type"), interactions, "read and search only; create and update are not offered");
+        assertEquals("https://oralhealthalliance.net/fhir/StructureDefinition/ode-dental-claim", eob.at("/supportedProfile/0").asText());
+        Set<String> params = new HashSet<>();
+        eob.get("searchParam").forEach(p -> params.add(p.get("name").asText()));
+        assertEquals(Set.of("_id", "patient", "identifier", "status"), params);
+        assertTrue(eob.get("documentation").asText().contains("no published implementation guide defines it"), "it says the profile is not published");
+        assertTrue(cs.at("/rest/0/documentation").asText().contains("ExplanationOfBenefit: read and search only"),
+                "the general sentence must not say every type has create and update");
+    }
 }
