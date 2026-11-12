@@ -16,6 +16,7 @@ FHIR does not let a profile derived from the PAS Claim widen a required binding,
 
 ## What it is, and what it is not
 
+- **The UC07 I2 `Claim` claims it** (owner decision, 2026-11-12): I2 is a PAS claim that uses this oral profile, so its CDT codes validate. The cumulative I2 and I4 Bundles validate with 0 errors (they had 3 against plain PAS).
 - **A prior-authorization request, not a claim for payment.** `Claim.use` is pinned to `preauthorization` (inherited from PAS), so this is the X12 **278**-shaped request. It is **not** the X12 **837D** dental claim; the ODE IG plans `ODEOralClaim` for that, which is why "Prior Authorization" is in the name.
 - **"Oral" means the intended use, not a restriction.** PAS's own `Claim.type` rule (`institutional | professional | oral`) is inherited unchanged, so the profile does not itself force `type = oral`.
 

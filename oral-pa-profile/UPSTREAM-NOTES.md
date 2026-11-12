@@ -51,6 +51,8 @@ The canonical IG is `lp-digitalhealth/ode-ig` (FSH only, SUSHI + IG Publisher; i
 | item 1 given a CPT code | oral PA profile | 0 |
 | the same Claim with `use = claim` (a claim for payment) | oral PA profile | **1** ("fixed to 'preauthorization'"): it cannot be mistaken for an 837D claim |
 
+**Bundles (2026-11-12, I2 `Claim` switched to this profile):** the cumulative UC07 I2 (50 entries) and I4 (62 entries) Bundles validate with **0 errors** (260 and 347 warnings); before the switch each had 3. The PAS `ClaimResponse.request` reference to the Claim raised no error (not investigated why; the PAS Bundle profile itself was not run).
+
 For the same Claim, the PAS run and the oral-PA-profile run differ only in the 3 errors disappearing and 3 new warnings that the CDT code
 system cannot be code-checked with terminology off (expected: CDT is now in scope of the binding), plus one information message that
 differs only in the profile URL it names. All 33 other messages are common to both runs.
