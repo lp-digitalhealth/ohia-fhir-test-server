@@ -29,6 +29,8 @@ A second, related finding: the PAS `Claim` profile's `supportingInfo:AdditionalI
 
 ## 2. For the ODE IG maintainers (a PROPOSAL; nothing here edits `ode-ig`)
 
+**Status (owner, 2026-11-12): the profile stays in this repo and is not being moved to `ode-ig`.** This section is kept only as a record of why moving it would be a real decision, in case that changes.
+
 The canonical IG is `lp-digitalhealth/ode-ig` (FSH only, SUSHI + IG Publisher; its `CLAUDE.md` governs). The profile is in this repo, not there, because adopting it is a decision for its maintainers:
 
 - **New dependency.** `ode-ig` depends on US Core 6.1.0 and COW 1.0.0-ballot (CARIN BB was removed and "must not be reintroduced"). This profile is based on PAS and needs `hl7.fhir.us.davinci-pas#2.2.1`, whose profiles reference **US Core 7.0.0** profiles, against the IG's US Core 6.1.0 pin. The plan only says `$submit` is "modeled on" PAS; PAS is not a dependency today.

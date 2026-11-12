@@ -1,6 +1,6 @@
 # OHIA PAS Oral Prior Authorization Claim profile (interim): a PAS Claim that accepts CDT
 
-**Status: DRAFT, interim, 2026-11-12.** Not part of Da Vinci PAS and not (yet) part of the ODE IG (`lp-digitalhealth/ode-ig`). Decision F31 in
+**Status: DRAFT, interim, 2026-11-12.** Not part of Da Vinci PAS and not part of the ODE IG (`lp-digitalhealth/ode-ig`): by owner decision (2026-11-12) it lives in this repo. Decision F31 in
 [`../docs/OHIA_FHIR_Test_server_PLAN.md`](../docs/OHIA_FHIR_Test_server_PLAN.md).
 
 ## Why this exists
