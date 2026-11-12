@@ -12,11 +12,11 @@ This document is for coding assistants to put the current state of the repo
 - A custom domain is **on hold** (owner, 2026-11-04). Nothing depends on it.
 
 ## Authentication (decision S1, open item S2)
-- **In the repo:** interim shared bearer token enforced by `deploy/Caddyfile`; `API_TOKEN` is passed by `deploy/docker-compose.yml`, documented in `deploy/.env.example` and `deploy/README.md` section 7.
+- **In the repo:** interim shared bearer token enforced by `deploy/Caddyfile`; `API_TOKEN` is passed by `deploy/docker-compose.yml`, documented in `deploy/.env.example` and `deploy/README.md` section 10.
 - **VERIFIED on the live server (real HAPI, rolled out 2026-11-04):** `GET /fhir/metadata` without a token returned 200; `GET /fhir/Patient` without a token returned 401; the same read with the token returned 200; `POST /fhir/Patient` without a token returned 401. From outside the VM, the no-token requests gave 200 (metadata), 401 (`/fhir/Patient`), 401 (the HAPI home page `/`) and 401 (the POST). HAPI and PostgreSQL did not restart; only Caddy was recreated.
 - **VERIFIED earlier on a stand-in upstream (not real HAPI):** a wrong, shortened or extended token gives 401; lowercase `bearer` gives 401 (the match is case-sensitive); `OPTIONS` is open; writes to `/fhir/metadata` need the token; path tricks such as `metadata/../Patient` are rejected; Compose refuses to start without `API_TOKEN`.
 - **UNVERIFIED:** browser CORS behavior against real HAPI, the case-sensitivity and wrong-token cases on the live server, and load.
-- **Operations:** the token lives only in the VM's `deploy/.env` (never in git) and with the owner. To roll out or rotate it, edit `API_TOKEN` in `.env` and run `docker compose up -d` (see `deploy/README.md` section 7).
+- **Operations:** the token lives only in the VM's `deploy/.env` (never in git) and with the owner. To roll out or rotate it, edit `API_TOKEN` in `.env` and run `docker compose up -d` (see `deploy/README.md` section 10).
 - **Revisit in January 2027:** replace the shared token with the real design (SMART backend services and standalone launch, F9 and M1). O1 is resolved (S3), so the facade exists and could take this over.
 
 ## Send UC04a, receive UC07, three-tab page (S8 to S10; `facade/`)
@@ -40,7 +40,7 @@ This document is for coding assistants to put the current state of the repo
 - **UNVERIFIED:** the live VM and Caddy for `/viewer/` and `/arex/jwks.json`; any real tester's ARex server; the discovery path and `authorization_details` type are assumptions; ARex wording (arex-8, 22, 39, 43, 48, 59) was read through a summarizer.
 
 ## Facade: UC07 sender and ARex content server (S3, S4, S5; `facade/`)
-- **In the repo (branch `November_Testing_Server_Setup`):** a Java 21 / Spring Boot service beside HAPI. Caddy routes only `/ode/*` and `/arex/*` to it; `/fhir` is unchanged. See `facade/README.md` and `deploy/README.md` section 8.
+- **In the repo (branch `November_Testing_Server_Setup`):** a Java 21 / Spring Boot service beside HAPI. Caddy routes only `/ode/*` and `/arex/*` to it; `/fhir` is unchanged. See `facade/README.md` and `deploy/README.md` sections 5 and 8.
 - **VERIFIED in the sandbox:** 94 automated tests pass (token lock, seed, read-back, per-send copy, send, SSRF refusals, registry, ARex tokens and content). Three security rules were mutation-checked (a deliberate break of manifest expiry, replay protection and manifest scoping each makes a test fail).
 - **VERIFIED end to end in the sandbox (21 checks):** against real HAPI 8.12.0 and the data repository at the pinned commit (`445d4ce`), a stand-in tester using a different JWT library (PyJWT) received the referral, got an ARex token, read the manifest, fetched both images with matching SHA-256 digests and ranges, and lost access on retraction.
 - **VERIFIED:** Caddy routing for `/fhir`, `/ode` and `/arex` against the Phase 1 facade and a stand-in HAPI. `/fhir` behavior was identical to the live server's.
@@ -48,7 +48,7 @@ This document is for coding assistants to put the current state of the repo
 - **UNVERIFIED / NOT DONE:** whether the facade answers through the live Caddy and certificate (`/ode/health`, `/arex/...`), any real tester's receiver, and ODE conformance (the profiles are unbuilt). The `Dockerfile` also builds on the sandbox host only through a workaround (see the build guide, section 4).
 - **Sender wire format is an inference** from the ODE IG's initiator CapabilityStatement (draft 0.1.0, no UC07 page). **ARex** is the v0.2.0 draft; the `authorization_details` type `arex-manifest`, 300-second tokens and the static client registry are this server's choices.
 - **Not built:** UC07 interactions 2 and 4, an automatic way to register testers, and token issuing for `/fhir`.
-- **Rollout (manual, owner):** `git pull`, `docker compose build facade`, `docker compose up -d`, then register a tester in `facade/config/clients.json` and seed (see `deploy/README.md` section 8).
+- **Rollout (manual, owner):** `git pull`, `docker compose build facade`, `docker compose up -d`, then register a tester in `facade/config/clients.json` and seed (see `deploy/README.md` sections 5, 7 and 8).
 
 ## For testers
 `docs/CONSUMER_GUIDE.md` explains how to connect. `docs/AREX_RETRIEVAL_GUIDE.md` (with the tested script `docs/examples/arex_fetch.py`) explains how to retrieve the referral's images. `docs/FACADE_BUILD_GUIDE.md` explains how the facade was built, step by step, for anyone who wants to reproduce or adapt it.

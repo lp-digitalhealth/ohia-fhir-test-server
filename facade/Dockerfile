@@ -1,13 +1,17 @@
 # Multi-stage build. Both base images publish linux/amd64 and linux/arm64 variants, so this
-# builds natively on the Oracle Arm VM (not yet verified there).
-FROM maven:3.9-eclipse-temurin-21 AS build
+# builds natively on the Oracle Arm VM (observed there by the owner, 2026-11-05).
+# The two base images are build arguments (defaults = the Docker Hub images) so a build behind a Docker Hub
+# rate limit (HTTP 429) or a registry mirror can substitute them: set MAVEN_IMAGE / JRE_IMAGE in deploy/.env.
+ARG MAVEN_IMAGE=maven:3.9-eclipse-temurin-21
+ARG JRE_IMAGE=eclipse-temurin:21-jre
+FROM ${MAVEN_IMAGE} AS build
 WORKDIR /src
 COPY pom.xml .
 RUN mvn -q -B dependency:go-offline
 COPY src src
 RUN mvn -q -B package -DskipTests
 
-FROM eclipse-temurin:21-jre
+FROM ${JRE_IMAGE}
 RUN groupadd --system app && useradd --system --gid app --home-dir /app app \
     && mkdir -p /data && chown app:app /data
 WORKDIR /app

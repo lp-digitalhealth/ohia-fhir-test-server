@@ -237,7 +237,7 @@ We did this for three rules: ignoring manifest expiry (2 tests failed), allowing
 Stand-ins prove your code, not your assumptions. Run the whole flow against a **real HAPI** and the **real data repository at the pinned commit**, with a stand-in tester written independently (Python and PyJWT, a different JWT library than the facade's Nimbus). The commands are in `facade/e2e/README.md`; the checker is `facade/e2e/run_e2e.py`. It makes 21 checks, from "seed loads 37 resources into real HAPI" through "token issued", "replay refused", "images match their digests", "retraction ends access" to "the delivery log never contains the tester's token". All 21 passed.
 
 ### Step 14: deploy
-Follow `deploy/README.md` section 8: `git pull`, `docker compose build facade`, `docker compose up -d`, register a tester in `facade/config/clients.json`, seed, send. **Build before starting**, so a build problem cannot interrupt the running stack.
+Follow `deploy/README.md` sections 5, 7 and 8: `git pull`, `docker compose build facade`, `docker compose up -d`, register a tester in `facade/config/clients.json`, seed, send. **Build before starting**, so a build problem cannot interrupt the running stack.
 
 ---
 
