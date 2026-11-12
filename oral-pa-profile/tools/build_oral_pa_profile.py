@@ -1,14 +1,14 @@
-"""Build the OHIA oral-claim overlay from the Da Vinci PAS 2.2.1 package and prove it differs from PAS in ONE thing.
+"""Build the OHIA PAS Oral Prior Authorization Claim profile from the Da Vinci PAS 2.2.1 package and prove it differs from PAS in ONE thing.
 
-The overlay is a copy of PAS `profile-claim` in which the ONLY change that matters is the binding of
-`Claim.item.productOrService`: PAS binds it (required) to X12278RequestedServiceType, which has no CDT; the overlay binds it
+The profile is a copy of PAS `profile-claim` in which the ONLY change that matters is the binding of
+`Claim.item.productOrService`: PAS binds it (required) to X12278RequestedServiceType, which has no CDT; this profile binds it
 (still required) to a value set that is that same value set PLUS the CDT code system. A profile DERIVED from the PAS Claim cannot
-widen a required binding (FHIR profiling), so the overlay is derived from the core Claim instead.
+widen a required binding (FHIR profiling), so this profile is derived from the core Claim instead.
 
 Usage:
-  python3 -I build_overlay.py <extracted PAS 2.2.1 package dir (the folder holding package.json)> <output dir>
-Writes StructureDefinition-ohia-pas-claim-cdt.json and ValueSet-ohia-requested-service-type-cdt.json, then runs the self-diff.
-Exits non-zero if the overlay differs from PAS in anything other than the allowed list.
+  python3 -I build_oral_pa_profile.py <extracted PAS 2.2.1 package dir (the folder holding package.json)> <output dir>
+Writes StructureDefinition-ohia-pas-oral-pa-claim.json and ValueSet-ohia-requested-service-type-cdt.json, then runs the self-diff.
+Exits non-zero if the profile differs from PAS in anything other than the allowed list.
 """
 import copy
 import json
@@ -19,7 +19,7 @@ PAS_DIR, OUT = sys.argv[1], sys.argv[2]
 PAS_VER = "2.2.1"
 PAS_CLAIM = "http://hl7.org/fhir/us/davinci-pas/StructureDefinition/profile-claim"
 PAS_VS = f"http://hl7.org/fhir/us/davinci-pas/ValueSet/X12278RequestedServiceType|{PAS_VER}"
-SD_URL = "https://oralhealthalliance.net/fhir/StructureDefinition/ohia-pas-claim-cdt"
+SD_URL = "https://oralhealthalliance.net/fhir/StructureDefinition/ohia-pas-oral-pa-claim"
 VS_URL = "http://ohia-codes.org/ValueSet/ohia-requested-service-type-cdt"
 TARGET_PATH = "Claim.item.productOrService"
 VERSION = "0.1.0"
@@ -33,7 +33,7 @@ def load(name):
 
 claim = load("StructureDefinition-profile-claim.json")
 base = load("StructureDefinition-profile-claim-base.json")
-assert claim["version"] == PAS_VER and base["version"] == PAS_VER, "this overlay is pinned to PAS 2.2.1"
+assert claim["version"] == PAS_VER and base["version"] == PAS_VER, "this profile is pinned to PAS 2.2.1"
 
 # ---------------------------------------------------------------- value set: PAS service types UNION the CDT system
 # Two separate include entries = union. (valueSet and system inside ONE include would be an intersection.)
@@ -60,17 +60,19 @@ sd = copy.deepcopy(claim)
 for k in ("identifier", "extension", "contact", "text"):
     sd.pop(k, None)  # PAS-specific identity/metadata is not ours to claim
 sd.update({
-    "id": "ohia-pas-claim-cdt",
+    "id": "ohia-pas-oral-pa-claim",
     "url": SD_URL,
     "version": VERSION,
-    "name": "OHIAPASClaimCDT",
-    "title": "OHIA PAS Claim (CDT accepted)",
+    "name": "OHIAPASOralPAClaim",
+    "title": "OHIA PAS Oral Prior Authorization Claim",
     "status": "draft",
     "date": DATE,
     "publisher": "Oral Health Interoperability Alliance (OHIA)",
-    "description": ("INTERIM OVERLAY, not part of Da Vinci PAS. An exact copy of the PAS 2.2.1 Claim profile (profile-claim, with profile-claim-base "
-                    "merged in) in which the ONLY change is that Claim.item.productOrService may also take a CDT code (http://www.ada.org/cdt). "
-                    "Binding strength stays required. Not PAS-conformant by definition. Remove it if PAS adds CDT to its own value set."),
+    "description": ("INTERIM, not part of Da Vinci PAS. An exact copy of the PAS 2.2.1 Claim profile (profile-claim, with profile-claim-base "
+                    "merged in) in which the ONLY change is that Claim.item.productOrService may also take a CDT code (http://www.ada.org/cdt), so an "
+                    "oral (dental) prior-authorization REQUEST can carry its CDT procedure code. It is a request (Claim.use is pinned to "
+                    "preauthorization), not a claim for payment (X12 837D). It does not itself restrict Claim.type to oral: PAS's own type rule is "
+                    "inherited unchanged. Binding strength stays required. Not PAS-conformant by definition. Remove it if PAS adds CDT to its own value set."),
     "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Claim",
     "derivation": "constraint",
 })
@@ -81,7 +83,7 @@ for e in sd["snapshot"]["element"]:
     if e["path"] == TARGET_PATH and "binding" in e:
         assert e["binding"]["strength"] == "required" and e["binding"]["valueSet"] == PAS_VS, e["binding"]
         e["binding"] = dict(e["binding"], valueSet=VS_URL)
-        e["binding"]["description"] = "PAS X12 278 requested service types plus CDT (OHIA overlay)"
+        e["binding"]["description"] = "PAS X12 278 requested service types plus CDT (OHIA oral PA profile)"
         changed += 1
 assert changed == 1, f"expected to change exactly one snapshot binding, changed {changed}"
 
@@ -106,11 +108,11 @@ if not any(e["path"] == TARGET_PATH and "binding" in e for e in diff_elements):
         hit = {"id": target_id, "path": TARGET_PATH}
         diff_elements.append(hit)
         diff_elements.sort(key=lambda e: order.index(e["id"]))
-    hit["binding"] = {"strength": "required", "valueSet": VS_URL, "description": "PAS X12 278 requested service types plus CDT (OHIA overlay)"}
+    hit["binding"] = {"strength": "required", "valueSet": VS_URL, "description": "PAS X12 278 requested service types plus CDT (OHIA oral PA profile)"}
 sd["differential"] = {"element": diff_elements}
 
 os.makedirs(OUT, exist_ok=True)
-with open(os.path.join(OUT, "StructureDefinition-ohia-pas-claim-cdt.json"), "w", encoding="utf-8", newline="\n") as f:
+with open(os.path.join(OUT, "StructureDefinition-ohia-pas-oral-pa-claim.json"), "w", encoding="utf-8", newline="\n") as f:
     json.dump(sd, f, indent=2, ensure_ascii=False)
     f.write("\n")
 with open(os.path.join(OUT, "ValueSet-ohia-requested-service-type-cdt.json"), "w", encoding="utf-8", newline="\n") as f:
@@ -157,4 +159,4 @@ if problems:
     for p in problems:
         print("  -", p)
     sys.exit(1)
-print("SELF-DIFF PASSED: the overlay differs from PAS profile-claim 2.2.1 only in the Claim.item.productOrService binding")
+print("SELF-DIFF PASSED: the oral PA profile differs from PAS profile-claim 2.2.1 only in the Claim.item.productOrService binding")
