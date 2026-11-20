@@ -57,6 +57,9 @@ This document is for coding assistants to put the current state of the repo
 - **KNOWN CONFLICT (owner decision):** the ODE IG (`ode-ig`) removed its EOB profile on purpose ("No CARIN Blue Button"; plan: `Claim` submission with `$submit`). The data repository still declares `ode-dental-claim`, and nothing publishes a StructureDefinition for it. This endpoint serves the existing data anyway, as the owner asked, and validates nothing against the profile.
 - **Not built:** a StructureDefinition for the profile, profile validation, paging beyond `_count`, `_include` of the referenced Patient, Organization and Coverage, and the UC05 and UC01 EOBs (a different shape).
 
+## Patient-app base (UC07 interaction 6; `facade/`)
+`/patient-access/fhir` serves CARIN Blue Button 2.2.0 `Patient`, `Coverage`, `Organization`, `Practitioner` and `ExplanationOfBenefit` for patient-facing apps (read and search only). Load it with `POST /ode/admin/seed-patient-access`; it takes the interaction-06 files from `ohia-test-data` at a pinned commit. Found by the payer online member ID. Shared token for now. Detail: `facade/README.md`, section "Patient-app base". **Verified:** the full facade suite (233 tests), the real jar against the real data at the pinned commit on this machine (seed, lookups, refusals, data kept across a restart). **Not verified:** the HL7 validator on the data, the Caddy routes, a deployed VM. A write attempt answers 405 in Spring's default JSON, not a FHIR OperationOutcome.
+
 ## For testers
 `docs/CONSUMER_GUIDE.md` explains how to connect. `docs/AREX_RETRIEVAL_GUIDE.md` (with the tested script `docs/examples/arex_fetch.py`) explains how to retrieve the referral's images. `docs/FACADE_BUILD_GUIDE.md` explains how the facade was built, step by step, for anyone who wants to reproduce or adapt it.
 

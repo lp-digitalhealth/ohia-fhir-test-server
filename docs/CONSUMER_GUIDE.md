@@ -135,6 +135,15 @@ curl -s -H "Authorization: Bearer $TOKEN" "$BASE/fhir/ExplanationOfBenefit?ident
 
 Search parameters: `patient`, `identifier`, `status`, `_id`, `_count`. Anything else is a 400, not an empty result. You cannot create or change these (405). If a search returns a Bundle that says nothing is loaded, ask the organizer to run `POST /ode/admin/seed-eob`.
 
+## Patient-facing apps: the payer's claims data (UC07 interaction 6)
+A second base, `https://<server>/patient-access/fhir`, serves the payer's CARIN Blue Button 2.2.0 view of the test member. Same bearer token as the rest of the server. Read it as the patient app would:
+
+1. Read `GET /patient-access/fhir/metadata` (no token needed).
+2. Find the member with the payer's online member ID: `GET /Patient?identifier=https://dentaquest.example.org/fhir/online-id|DQ-ONLINE-TX-0038211`.
+3. Then `GET /Coverage?beneficiary=Patient/<id>` and `GET /ExplanationOfBenefit?patient=<id>` (two adjudicated claims).
+
+Match these records to the dentist-side ones by business keys (the Medicaid beneficiary ID, the claim and pre-authorization numbers), not by resource id. See the UC07 interaction 6 document in `ohia-test-data`. Read and search only; no SMART login yet. The data is synthetic.
+
 ## Good to know
 - **The server is shared.** Everyone with the token can read and change everyone's data. Give your resources an identifier or tag that identifies you or your organization, and don't rely on another tester's data staying unchanged.
 - **Responses** follow FHIR. Errors come back as an `OperationOutcome`. A `401` comes from the access check, before FHIR is involved.
