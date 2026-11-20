@@ -105,6 +105,9 @@ curl -s -H "Authorization: Bearer $TOKEN" $BASE/ode/sends                       
 - **Observed on the Arm VM (2026-11-05):** `docker compose build facade` succeeded and the container ran. Its Docker health check first reported `unhealthy` because of a probe bug (it searched for the text `200 OK`; Tomcat sends `HTTP/1.1 200`). The `Dockerfile` is fixed; after `git pull`, run `docker compose build facade` and `docker compose up -d` again and `docker compose ps` should show `healthy`.
 - **Not tested:** the facade behind the live Caddy and certificate (check `/ode/health` and `/arex/.well-known/smart-configuration`), and any real tester's receiver.
 
+## 8a. Patient-app base (rollout note)
+This release adds `/patient-access/fhir` and routes in `Caddyfile` (`@pa_meta`, `@pa_preflight`, `@pa`). After `git pull`, `docker compose build facade` and `docker compose up -d`, load the data once with `POST /ode/admin/seed-patient-access` (shared token) and open `/patient-access/fhir/metadata`. The Caddy routes have **not** been run; if the base answers 502 or 404 from outside, check them first.
+
 ## 9. Receiving UC04a and viewing the result
 
 The facade also receives UC04a interaction 1 and pulls its images with ARex (plan items S6 and S7). Testers send to `POST /ode/receive/uc04a`; the guide for them is `docs/UC04A_SENDING_GUIDE.md`.

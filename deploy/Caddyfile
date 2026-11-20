@@ -30,7 +30,36 @@
 	# paths return 502 and nothing else is affected.
 	@arex path /arex /arex/*
 	@ode path /ode /ode/*
+
+	# The patient-app FHIR base (/patient-access/fhir) is served by the facade, not HAPI. Its capability statement is open
+	# (discovery needs no credentials) and CORS preflights go to the facade, which answers them; everything else needs the
+	# shared token here and again in the facade. A write is refused by the facade (405), never stored in HAPI.
+	@pa_meta {
+		path /patient-access/fhir/metadata
+		method GET HEAD
+	}
+	@pa_preflight {
+		path /patient-access/fhir /patient-access/fhir/*
+		method OPTIONS
+	}
+	@pa path /patient-access/fhir /patient-access/fhir/*
 	@viewer path /viewer /viewer/*
+
+	handle @pa_meta {
+		reverse_proxy facade:8080
+	}
+	handle @pa_preflight {
+		reverse_proxy facade:8080
+	}
+	handle @pa {
+		handle @authed {
+			reverse_proxy facade:8080
+		}
+		handle {
+			header WWW-Authenticate Bearer
+			respond "Unauthorized: send Authorization: Bearer <token>" 401
+		}
+	}
 
 	# The received-payloads page is static and holds no data and no secrets: it asks the person for the
 	# shared token and calls /ode/* with it. So it loads without a token (a browser cannot send one for
