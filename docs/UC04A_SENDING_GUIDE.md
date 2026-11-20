@@ -16,13 +16,17 @@ curl -X POST "https://<server>/ode/receive/uc04a" \
 ```
 
 - The body is the UC04a interaction 1 **transaction Bundle**, with the ARex manifest embedded: a manifest `List` (profile `arex-manifest`), one `DocumentReference` per image (profile `arex-content-entry`) and the manifest `Provenance`. Maximum 10 MB (413 above that).
-- Not a transaction Bundle: **422**, nothing stored. HAPI refuses it for a reason we cannot work around: **502**, no pull; the reply's `"error"` line says why.
+- Not a transaction Bundle: **422**, nothing stored. HAPI refuses it for a reason we cannot work around: **502**, no pull. Over 10 MB: **413**. Each of these is a FHIR `OperationOutcome` (`application/fhir+json`) whose `issue[0].diagnostics` says why.
 - **References inside the Bundle.** Write them as ordinary relative references (`Patient/patient-sarah-okonkwo`), or as full addresses under `https://<server>/fhir/`. If your app was given `.../ode/receive/uc04a` as a "FHIR base" and wrote full addresses under that, they are accepted too (they are declared as ours). A reference to any other server is refused with `HAPI-0507` and a 502.
-- Otherwise **200** with a **receipt** (JSON). A failed pull is a result, not an error: read `findings` and `objects`.
+- Otherwise **200** at once, with a FHIR **`transaction-response` Bundle** (HAPI's own answer to storing your Bundle), as FHIR defines for a transaction. It does **not** wait for the image callback, so a slow ARex server cannot make your request time out.
+- Where to read the callback's result: the response headers `Link: <https://<server>/ode/receipts/{id}>; rel="receipt"` and `X-Receipt-Id: {id}`. Then `GET /ode/receipts/{id}` (shared token). Its `state` is `pending` while the pull runs, then `complete`. A failed pull is a result, not an error: read `findings` and `objects`. Other states: `failed` (the callback crashed) and `interrupted` (the server restarted during it).
+- Scripts and organizers who want the finished receipt in the reply can add `?wait=true` to the URL. That waits for the pull and answers with the receipt as plain JSON (not FHIR), as the endpoint did before.
 
 The shared token is the same interim token as the rest of the server (plan item S1).
 
 ## 2. What the server does, in order
+
+Steps 1 and 2 happen before the answer is sent; steps 3 and 4 happen after it.
 
 1. Validates the Bundle and finds the manifest, the entries and the referral id (`urn:ohia:referral-id`).
 2. Stores the Bundle in HAPI exactly as received. If HAPI refuses only because of a `Subscription` (real HAPI 8.12 needs a `backport-filter-criteria` extension on it, which the UC04a data does not carry), it stores everything else and reports `SUBSCRIPTION_NOT_STORED`.
@@ -61,7 +65,7 @@ Register that client id and key (or the JWKS URL) in your authorization server b
 ## 5. Reading the result
 
 - Browser: `https://<server>/viewer/`. Type the shared token (kept in that tab only). It lists receipts and shows findings, per-image results and the images.
-- API (shared token): `GET /ode/receipts`, `GET /ode/receipts/{id}`, `GET /ode/receipts/{id}/images/{fileKey}`. Images are served inline only if the bytes really are JPEG or PNG; anything else is a download.
+- API (shared token): `GET /ode/receipts`, `GET /ode/receipts/{id}`, `GET /ode/receipts/{id}/images/{fileKey}`. Check `state` first: `pending` means the callback is still running and the images are not there yet. Images are served inline only if the bytes really are JPEG or PNG; anything else is a download.
 
 ## 6. Findings
 

@@ -19,7 +19,7 @@ docker rm -f e2e-hapi
 
 ## UC04a receiver and viewer
 
-`run_uc04a_e2e.py` sends the real UC04a bundle to `/ode/receive/uc04a` with an independent Python sender (`uc04a_sender_stub.py`, PyJWT) that verifies the facade's signed assertion with the key from `/arex/jwks.json`. Start HAPI and the facade as above (no clients file needed), then:
+`run_uc04a_e2e.py` sends the real UC04a bundle to `/ode/receive/uc04a?wait=true` (the scripts ask for the finished receipt; without `wait=true` the server answers at once with a FHIR transaction-response and finishes the callback afterwards) with an independent Python sender (`uc04a_sender_stub.py`, PyJWT) that verifies the facade's signed assertion with the key from `/arex/jwks.json`. Start HAPI and the facade as above (no clients file needed), then:
 
 ```bash
 API_TOKEN=$API_TOKEN E2E_PAYLOAD=authored python3 e2e/run_uc04a_e2e.py      # authored | no-subscription | with-filter

@@ -101,7 +101,7 @@ class ReceiveManifestsTest {
     }
 
     private JsonNode receive(String body) throws Exception {
-        return UcStubs.M.readTree(mvc.perform(post("/ode/receive/uc04a").header("Authorization", "Bearer " + S1)
+        return UcStubs.M.readTree(mvc.perform(post("/ode/receive/uc04a?wait=true").header("Authorization", "Bearer " + S1)
                 .contentType("application/fhir+json").content(body)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
     }
 

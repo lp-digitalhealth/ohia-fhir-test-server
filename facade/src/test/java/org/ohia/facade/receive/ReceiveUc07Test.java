@@ -108,7 +108,7 @@ class ReceiveUc07Test {
     }
 
     private ResultActions receive(String useCase, String body) throws Exception {
-        return mvc.perform(post("/ode/receive/" + useCase).header("Authorization", "Bearer " + S1).contentType("application/fhir+json").content(body));
+        return mvc.perform(post("/ode/receive/" + useCase + "?wait=true").header("Authorization", "Bearer " + S1).contentType("application/fhir+json").content(body));
     }
 
     private JsonNode ok(String useCase, String body) throws Exception {

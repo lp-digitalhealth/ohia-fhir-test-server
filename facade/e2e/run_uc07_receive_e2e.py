@@ -45,7 +45,7 @@ for e in entries:  # the tester's content server is the stand-in: point the payl
 payload = json.dumps(bundle).encode()
 H = {"Authorization": "Bearer " + S1}
 
-st, _, b = call("POST", FACADE + "/ode/receive/uc07", {**H, "Content-Type": "application/fhir+json"}, payload)
+st, _, b = call("POST", FACADE + "/ode/receive/uc07?wait=true", {**H, "Content-Type": "application/fhir+json"}, payload)
 rc = json.loads(b) if st == 200 else {}
 check("UC07 payload received (HTTP 200) and accepted", st == 200 and rc.get("accepted") is True, st)
 check("tagged uc07, all %d entries stored" % len(bundle["entry"]), rc.get("useCase") == "uc07" and rc.get("hapiEntries") == len(bundle["entry"]), (rc.get("useCase"), rc.get("hapiEntries")))

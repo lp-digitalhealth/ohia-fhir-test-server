@@ -50,6 +50,13 @@ This document is for coding assistants to put the current state of the repo
 - **Not built:** UC07 interactions 2 and 4, an automatic way to register testers, and token issuing for `/fhir`.
 - **Rollout (manual, owner):** `git pull`, `docker compose build facade`, `docker compose up -d`, then register a tester in `facade/config/clients.json` and seed (see `deploy/README.md` section 8).
 
+## Receive answers with a FHIR transaction-response (`facade/`, branch `feature/receive-fhir-response`, not merged or deployed)
+- **Why:** a client that posts a referral should get a standard FHIR answer (R4 http, "Batch/Transaction Response": a `transaction-response` Bundle, or an `OperationOutcome` on failure). It used to get a custom receipt, only after the whole ARex callback, so a slow sender timed out and saw nothing.
+- **In the repo:** `POST /ode/receive/{uc04a|uc07}` stores the Bundle, answers 200 with HAPI's `transaction-response` and headers `Link` (rel="receipt") and `X-Receipt-Id`, and runs the callback afterwards on a small thread pool. Failures are `OperationOutcome`s (422, 413, 502). `Receipt.state` is `pending`, `complete`, `failed` or `interrupted` (a receipt left pending by a restart is marked `interrupted` at start-up). `?wait=true` keeps the old wait-and-return-the-receipt answer, and the e2e scripts use it. The viewer shows a pending receipt.
+- **VERIFIED in the sandbox:** the full facade suite passes (204 tests, 0 failures). Seven new rules were each broken on purpose and a test failed (answer waits for the pull, odd HAPI body passed on, restart sweep, Link header, error not an OperationOutcome, crash not caught, `wait=true`); one control first survived because its test used a non-JSON body, and was fixed.
+- **NOT VERIFIED:** the real jar against real HAPI, the viewer page in a browser, the live VM, and any real client. If HAPI refuses only the Subscription, the answer is HAPI's answer for the entries stored (29 of 30) and `SUBSCRIPTION_NOT_STORED` is in the receipt: that deviates from the transaction rule of one answer entry per request entry.
+- **Open:** the ODE IG still says only that the recipient "accepts referral transaction Bundles"; it should state this response.
+
 ## For testers
 `docs/CONSUMER_GUIDE.md` explains how to connect. `docs/AREX_RETRIEVAL_GUIDE.md` (with the tested script `docs/examples/arex_fetch.py`) explains how to retrieve the referral's images. `docs/FACADE_BUILD_GUIDE.md` explains how the facade was built, step by step, for anyone who wants to reproduce or adapt it.
 

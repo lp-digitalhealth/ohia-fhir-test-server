@@ -75,7 +75,7 @@ for e in entries:
 payload = json.dumps(bundle).encode()
 H = {"Authorization": "Bearer " + S1}
 
-st, _, b = call("POST", FACADE + "/ode/receive/uc04a", {**H, "Content-Type": "application/fhir+json"}, payload)
+st, _, b = call("POST", FACADE + "/ode/receive/uc04a?wait=true", {**H, "Content-Type": "application/fhir+json"}, payload)
 rc = json.loads(b) if st == 200 else {}
 check("payload with two manifests received and accepted", st == 200 and rc.get("accepted") is True, st)
 check("both manifests are recorded on the receipt", rc.get("manifestId") == "arex-manifest-intraoral-photos, arex-manifest-documents", rc.get("manifestId"))
