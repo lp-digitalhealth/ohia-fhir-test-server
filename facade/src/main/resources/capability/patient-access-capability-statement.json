@@ -1,0 +1,229 @@
+{
+  "resourceType": "CapabilityStatement",
+  "name": "OhiaTestServerPatientAccess",
+  "title": "OHIA FHIR test server: patient access base (CARIN Blue Button 2.2.0), target capability",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-11-11",
+  "publisher": "OHIA test server (Leavitt Partners)",
+  "description": "A test server's FHIR base for patient-facing apps. It serves the payer's own view of a member as CARIN Blue Button 2.2.0 resources, read-only. It states what is implemented today, not a certified capability. See rest.documentation.",
+  "kind": "instance",
+  "software": {
+    "name": "OHIA facade (patient access)"
+  },
+  "implementation": {
+    "description": "OHIA test server, patient access base",
+    "url": "{{BASE}}/patient-access/fhir"
+  },
+  "fhirVersion": "4.0.1",
+  "format": [
+    "json",
+    "application/fhir+json"
+  ],
+  "implementationGuide": [
+    "http://hl7.org/fhir/us/carin-bb/ImplementationGuide/hl7.fhir.us.carin-bb|2.2.0"
+  ],
+  "rest": [
+    {
+      "mode": "server",
+      "documentation": "TEST SERVER, synthetic data only. IMPLEMENTED TODAY: read and search-type on Patient, Coverage, ExplanationOfBenefit, Organization and Practitioner, with the search parameters listed per type (the ones the CARIN Blue Button 2.2.0 CapabilityStatement requires, plus Patient identifier so an app can find the member by the payer's online member ID); the data is loaded by an organizer from a pinned commit of the data repository; one shared bearer token for everything except this statement. NOT IMPLEMENTED: SMART App Launch or any OAuth flow, vread and history, _include and _revinclude, paging beyond _count, RelatedPerson, guardian or proxy access for a minor, and every write (POST, PUT and DELETE are refused). A search parameter this server does not support is refused with 400, never ignored.",
+      "security": {
+        "description": "Interim: send Authorization: Bearer <shared token> on every request except GET {{BASE}}/patient-access/fhir/metadata. A request without a valid token is refused with 401. Target: SMART App Launch standalone launch with patient scope; it is not built, so no OAuth token address is declared here and this statement claims no security service."
+      },
+      "resource": [
+        {
+          "type": "Patient",
+          "supportedProfile": [
+            "http://hl7.org/fhir/us/carin-bb/StructureDefinition/C4BB-Patient|2.2.0"
+          ],
+          "documentation": "The payer's record of the member.",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "search-type"
+            }
+          ],
+          "searchParam": [
+            {
+              "name": "_id",
+              "type": "token"
+            },
+            {
+              "name": "_lastUpdated",
+              "type": "date",
+              "documentation": "Prefixes eq, gt, ge, lt, le."
+            },
+            {
+              "name": "identifier",
+              "type": "token",
+              "documentation": "Find the member by the payer's online member ID: identifier=<system>|<value>."
+            }
+          ]
+        },
+        {
+          "type": "Coverage",
+          "supportedProfile": [
+            "http://hl7.org/fhir/us/carin-bb/StructureDefinition/C4BB-Coverage|2.2.0"
+          ],
+          "documentation": "The member's coverage.",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "search-type"
+            }
+          ],
+          "searchParam": [
+            {
+              "name": "_id",
+              "type": "token"
+            },
+            {
+              "name": "_lastUpdated",
+              "type": "date",
+              "documentation": "Prefixes eq, gt, ge, lt, le."
+            },
+            {
+              "name": "beneficiary",
+              "type": "reference",
+              "documentation": "Patient/<id>, a bare id, or a full URL."
+            },
+            {
+              "name": "patient",
+              "type": "reference",
+              "documentation": "Same as beneficiary."
+            },
+            {
+              "name": "status",
+              "type": "token"
+            },
+            {
+              "name": "identifier",
+              "type": "token"
+            }
+          ]
+        },
+        {
+          "type": "ExplanationOfBenefit",
+          "supportedProfile": [
+            "http://hl7.org/fhir/us/carin-bb/StructureDefinition/C4BB-ExplanationOfBenefit-Oral|2.2.0"
+          ],
+          "documentation": "The member's adjudicated oral claims (the financial Oral profile).",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "search-type"
+            }
+          ],
+          "searchParam": [
+            {
+              "name": "_id",
+              "type": "token"
+            },
+            {
+              "name": "_lastUpdated",
+              "type": "date",
+              "documentation": "Prefixes eq, gt, ge, lt, le."
+            },
+            {
+              "name": "patient",
+              "type": "reference",
+              "documentation": "Patient/<id>, a bare id, or a full URL."
+            },
+            {
+              "name": "type",
+              "type": "token",
+              "documentation": "system|code, |code, system| or code."
+            },
+            {
+              "name": "identifier",
+              "type": "token"
+            },
+            {
+              "name": "status",
+              "type": "token"
+            },
+            {
+              "name": "service-date",
+              "type": "date",
+              "documentation": "The billable period and every line's service date or period. Prefixes eq, gt, ge, lt, le."
+            },
+            {
+              "name": "service-start-date",
+              "type": "date"
+            },
+            {
+              "name": "billable-period-start",
+              "type": "date"
+            }
+          ]
+        },
+        {
+          "type": "Organization",
+          "supportedProfile": [
+            "http://hl7.org/fhir/us/carin-bb/StructureDefinition/C4BB-Organization|2.2.0"
+          ],
+          "documentation": "The payer and the billing practices the EOBs refer to.",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "search-type"
+            }
+          ],
+          "searchParam": [
+            {
+              "name": "_id",
+              "type": "token"
+            },
+            {
+              "name": "_lastUpdated",
+              "type": "date",
+              "documentation": "Prefixes eq, gt, ge, lt, le."
+            },
+            {
+              "name": "identifier",
+              "type": "token"
+            }
+          ]
+        },
+        {
+          "type": "Practitioner",
+          "supportedProfile": [
+            "http://hl7.org/fhir/us/carin-bb/StructureDefinition/C4BB-Practitioner|2.2.0"
+          ],
+          "documentation": "The clinicians the EOBs refer to.",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "search-type"
+            }
+          ],
+          "searchParam": [
+            {
+              "name": "_id",
+              "type": "token"
+            },
+            {
+              "name": "_lastUpdated",
+              "type": "date",
+              "documentation": "Prefixes eq, gt, ge, lt, le."
+            },
+            {
+              "name": "identifier",
+              "type": "token"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

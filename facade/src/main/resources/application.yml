@@ -25,6 +25,18 @@ facade:
     receiving:
       # The organization we play when a tester sends US a UC07 referral (the receiving specialist).
       uc07-requesting-organization: ${FACADE_UC07_RECEIVER_ORG:Organization/org-restorative-dental-tx}
+  eob:
+    # Oral claims-sharing ExplanationOfBenefit resources (the ODE oral profile, ode-dental-claim, derived from CARIN
+    # Blue Button), served read-only at GET /fhir/ExplanationOfBenefit. Loaded by POST /ode/admin/seed-eob from a PINNED
+    # commit of the data repository, never a moving branch. Bump the ref deliberately when the data changes.
+    data-base-url: ${FACADE_EOB_DATA_BASE_URL:https://raw.githubusercontent.com/lp-digitalhealth/ohia-test-data}
+    data-ref: ${FACADE_EOB_DATA_REF:6b84bb22769ac46d257d01def87f413b63895dac}
+    files:
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc02a-surgical-extraction/interactions/interaction-05/eob-d7210-claims-sharing.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc02b-commercial-implant/interactions/interaction-05/eob-extraction-implant-claims-sharing.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc03-pediatric-referral/interactions/interaction-05/eob-timothy-dental-claims-sharing.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc04a-teledentistry-commercial/interactions/interaction-05/eob-inoffice-claims-sharing.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc04a-teledentistry-commercial/interactions/interaction-05/eob-teledentistry-claims-sharing.json
   send:
     # Both flags below exist for automated tests only and must stay false in a deployment.
     allow-http: false
@@ -43,3 +55,19 @@ facade:
     max-total-bytes: 50000000
     connect-timeout-seconds: 5
     read-timeout-seconds: 60
+  patient-access:
+    # The payer-side resources (CARIN Blue Button 2.2.0) served to patient apps at /patient-access/fhir. Loaded by
+    # POST /ode/admin/seed-patient-access from a PINNED commit of the data repository (UC07 interaction 6), never a
+    # moving branch. Bump the ref deliberately when the data changes.
+    data-base-url: ${FACADE_PATIENT_ACCESS_DATA_BASE_URL:https://raw.githubusercontent.com/lp-digitalhealth/ohia-test-data}
+    data-ref: ${FACADE_PATIENT_ACCESS_DATA_REF:1bb07a826e546391e777bae31394951be8434f04}
+    files:
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-06/patient-joe-castle-payer.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-06/coverage-joe-castle-dentaquest-payer.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-06/org-dentaquest-tx-payer.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-06/org-pediatric-dental-tx-payer.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-06/org-restorative-dental-tx-payer.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-06/pract-mary-parker-payer.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-06/pract-max-garcia-payer.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-06/eob-pediatric-evaluation-c4bb-oral.json
+      - 2026-CMS-Connectathon/fhir-resources/purpose-built/uc07-pediatric-rootcanal/interactions/interaction-06/eob-restorative-treatment-c4bb-oral.json

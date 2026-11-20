@@ -213,3 +213,35 @@ docker compose ps                     # facade should be healthy
 | arm64 (Oracle Ampere) | **OBSERVED** by the owner; the assistant has only run x86_64 |
 | Browser CORS behavior from a real page, load, concurrency | **UNVERIFIED** |
 | The facade's own tests (unit and end-to-end) | recorded in [`docs/CURRENT_STATE.MD`](../docs/CURRENT_STATE.MD); not re-run for this guide |
+
+## 13. Patient-app base (`/patient-access/fhir`): rollout
+
+This release adds a second FHIR base for patient-facing apps and its routes in `deploy/Caddyfile` (`@pa_meta`, `@pa_preflight`, `@pa`). Roll it out like section 5, and because the Caddyfile changed, recreate Caddy: a changed Caddyfile is **not** picked up by `docker compose up -d` or `caddy reload` (OBSERVED on the live VM, 2026-11-05).
+
+```bash
+git pull
+docker compose build facade
+docker compose up -d
+docker compose up -d --force-recreate caddy     # only Caddy restarts; HAPI and the database are not touched
+curl -s -X POST -H "Authorization: Bearer $TOKEN" $BASE/ode/admin/seed-patient-access   # once: load the payer-side data
+curl -s $BASE/patient-access/fhir/metadata | head -c 300                                # open; no token
+```
+
+If the base answers 502 or 404 from outside, check the Caddy routes first. They have **not** been run: there was no Docker here and the Caddy binary was not allowed to run.
+
+## 14. Oral claims-sharing EOBs under `/fhir`: rollout
+
+`GET /fhir/ExplanationOfBenefit` (read and search) is answered by the facade, not HAPI; see `facade/README.md`. Roll it out like section 13 (the Caddyfile changed here too, so recreate Caddy):
+
+```bash
+git pull
+docker compose build facade
+docker compose up -d
+docker compose up -d --force-recreate caddy
+curl -s -X POST -H "Authorization: Bearer $TOKEN" $BASE/ode/admin/seed-eob     # once: load the five oral EOBs
+curl -s -H "Authorization: Bearer $TOKEN" "$BASE/fhir/ExplanationOfBenefit?patient=Patient/patient-sarah-okonkwo"   # expect total 2
+```
+
+- If the facade is down, only the `ExplanationOfBenefit` paths return 502; the rest of `/fhir` is unaffected.
+- A `POST` of an ExplanationOfBenefit to `/fhir` is refused (405) instead of being stored in HAPI.
+- **Not tested:** the new `@eob` Caddy route has not been run (same reason as section 13). Check the `curl` lines above, and `docker compose logs caddy` if the container does not start.

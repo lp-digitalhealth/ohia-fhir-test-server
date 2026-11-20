@@ -19,6 +19,8 @@ How it was built, step by step (for anyone who wants to repeat or adapt it): `do
 | `GET /arex/.well-known/smart-configuration` | anyone | SMART discovery. |
 | `POST /arex/auth/token` | registered tester | SMART Backend Services token: `client_credentials`, `private_key_jwt`, manifest-scoped. |
 | `GET /arex/List/{id}`, `GET /arex/List?arex-manifest-transaction-identifier=`, `GET /arex/Binary/{id}` | tester with a token | The manifest and its content objects (native octets or FHIR `Binary`; `Range` supported). |
+| `GET /fhir/ExplanationOfBenefit/{id}`, `GET /fhir/ExplanationOfBenefit?patient=&identifier=&status=&_id=&_count=` | shared token | Read and search of the five oral claims-sharing EOBs (see below). Read-only. |
+| `POST /ode/admin/seed-eob` | organizer | Loads those five EOBs from the data repo at a **pinned commit**; checks all five first and changes nothing if any fails. Idempotent. |
 
 "Organizer" means the shared `API_TOKEN` (decision S1), checked by Caddy and again inside the facade. The `/arex` paths do **not** accept it; they use the tokens issued by the token endpoint.
 
@@ -55,7 +57,7 @@ Environment variables (see `src/main/resources/application.yml`): `API_TOKEN`, `
 
 ```bash
 cd facade
-mvn test          # 94 tests, no network or Docker needed
+mvn test          # 223 tests, no network or Docker needed
 mvn package       # builds target/ohia-facade-0.1.0.jar
 ```
 
@@ -74,6 +76,28 @@ Docker (as the compose file does it): `docker compose build facade`.
 - **CapabilityStatement:** `GET /fhir/metadata` (open) returns the facade's statement of the capability this test server is going for, from `src/main/resources/capability/capability-statement.json` (edit it as data). It is draft and experimental and says what is implemented today and what is only the target. Caddy falls back to HAPI's own statement if the facade is down.
 - **Several manifests, scope, absolute references:** a received payload may carry several ARex manifests; each is pulled with its own token (`scope` defaults to `system/List.r system/DocumentReference.r system/Provenance.r system/Binary.r`, override with `facade.arex.scope` / `FACADE_AREX_SCOPE`). References to the requesting organization and to the manifest a Provenance targets are compared by type and id, so relative and absolute forms match. Non-image files are offered as downloads on the page.
 - **Known limit:** received payloads and the data we send from share one HAPI. A tester who sends us the sample referral under the same resource ids overwrites our copy of it. Use "Load the data" (or `POST /ode/admin/seed?useCase=...`) before sending to restore it.
+
+## Oral claims-sharing EOBs (read and search)
+
+`GET /fhir/ExplanationOfBenefit` serves the five oral claims-sharing `ExplanationOfBenefit` resources of the data repository (UC02a, UC02b, UC03 and the two of UC04a, all interaction 5), which declare the profile address `https://oralhealthalliance.net/fhir/StructureDefinition/ode-dental-claim` (the ODE oral profile, derived from CARIN Blue Button's Professional profile).
+
+- **Read-only.** Read by id and search by `patient` (a reference, a bare id, or a full URL), `identifier` (`system|value`, `|value`, `system|` or `value`), `status`, `_id` and `_count` (0 to 100). A comma means OR; a repeated parameter means AND. Any other parameter is refused with 400 and an OperationOutcome, so a client is never told "no results" for a question we did not understand. POST, PUT and DELETE are refused with 405.
+- **Not in HAPI.** The facade keeps the set in `facade_data` (`eob/oral-eobs.json`) and serves it itself. Caddy sends this path to the facade instead of HAPI (OPTIONS still goes to HAPI), and the shared token is required in Caddy and again in the facade (`OdeTokenFilter`).
+- **Loading.** `POST /ode/admin/seed-eob` fetches the five files at a pinned commit (`facade.eob.data-ref`) and checks each one (an ExplanationOfBenefit, a safe id, the profile declared, claim type `oral`, a `Patient/<id>` reference, no duplicate id) before it stores anything. Until it has run, a read is 404 and a search is an empty Bundle that says nothing is loaded.
+- **Not validated.** No published implementation guide defines the profile: the ODE IG removed its EOB profile on purpose and plans a `Claim`-based submission instead, while the data still declares this one. So the checks above are consistency checks on the data, not profile validation, and the facade publishes no StructureDefinition. The capability statement says so.
+- The five resources reference a Patient, Organization and other resources that are not served here; those references are not resolved.
+
+## Patient-app base (UC07 interaction 6)
+
+`/patient-access/fhir` is a second FHIR base, separate from `/fhir`, for patient-facing apps. It serves the payer's CARIN Blue Button 2.2.0 view of the UC07 member: `Patient`, `Coverage`, `Organization`, `Practitioner` and `ExplanationOfBenefit`, each with read (`GET /{type}/{id}`) and search (`GET /{type}`) only. Nothing can be written.
+
+- **Load the data:** `POST /ode/admin/seed-patient-access` fetches the nine interaction-06 files from `ohia-test-data` at the commit pinned in `facade.patient-access.data-ref`, checks them (allowed types, Blue Button `|2.2.0` profile, `meta.lastUpdated`, no duplicate ids, a Patient present, every reference a `Type/id` inside the set) and replaces the stored set only if all pass. Until then a read is 404 and a search is an empty Bundle that says nothing is loaded. To change the data, change the pin.
+- **Find the member:** `Patient?identifier=<system>|<value>` with the payer online member ID or the Medicaid beneficiary ID, then `Coverage?beneficiary=`, `ExplanationOfBenefit?patient=`.
+- **Search parameters:** the Blue Button CapabilityStatement set (EOB: `_id, patient, _lastUpdated, type, identifier, service-date, service-start-date, billable-period-start`; the other types `_id, _lastUpdated`) plus `identifier` on all five types, `status`, and Coverage `beneficiary`/`patient`. Dates take `eq, gt, ge, lt, le`. A comma is OR, a repeat is AND. `_count` is 0 to 100, `_format` accepts JSON only. Anything else is a 400 OperationOutcome, never a silent empty result.
+- **Access:** the interim shared bearer token, enforced in Caddy and again in the facade (`PatientAccessTokenFilter`). `GET /patient-access/fhir/metadata` and CORS preflights are open. Browser apps are allowed from any origin.
+- **CapabilityStatement:** `/patient-access/fhir/metadata`, from `src/main/resources/capability/patient-access-capability-statement.json`. It lists what is not implemented.
+- **Not implemented:** SMART login, `vread`, `_include`/`_revinclude`, paging beyond `_count`, guardian or proxy access, any write.
+- **Not checked:** the HL7 validator has not been run on the data, and the Caddy routes have not been run.
 
 ## Known limits
 
