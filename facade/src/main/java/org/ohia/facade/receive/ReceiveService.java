@@ -2,6 +2,7 @@ package org.ohia.facade.receive;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
@@ -69,7 +70,51 @@ public class ReceiveService {
         return useCase == UseCase.UC07 ? uc07Organization : uc04aOrganization;
     }
 
+    /**
+     * What {@link #accept} hands back: the receipt as saved so far ({@code pending}), HAPI's own transaction-response
+     * (what the sender is told) and everything {@link #complete} needs to run the pull.
+     */
+    public static final class Accepted {
+        private final Receipt pending;
+        private final String transactionResponse;
+        private final UseCase useCase;
+        private final List<JsonNode> manifests;
+        private final List<JsonNode> contentEntries;
+        private final List<ArexClient.Finding> findings;
+        private final boolean several;
+
+        Accepted(Receipt pending, String transactionResponse, UseCase useCase, List<JsonNode> manifests, List<JsonNode> contentEntries,
+                List<ArexClient.Finding> findings, boolean several) {
+            this.pending = pending;
+            this.transactionResponse = transactionResponse;
+            this.useCase = useCase;
+            this.manifests = manifests;
+            this.contentEntries = contentEntries;
+            this.findings = findings;
+            this.several = several;
+        }
+
+        public Receipt pending() {
+            return pending;
+        }
+
+        /** A FHIR {@code transaction-response} Bundle as JSON: HAPI's own, or one built from the entry count if HAPI's was unusable. */
+        public String transactionResponse() {
+            return transactionResponse;
+        }
+    }
+
+    /** Receive and wait for the pull: the whole thing in one call, as before the response was split from the pull. */
     public Receipt receive(UseCase useCase, String body) {
+        return complete(accept(useCase, body));
+    }
+
+    /**
+     * Everything up to and including the answer the sender is owed: validate, inspect the embedded manifests, store the
+     * payload in HAPI (a refusal throws and nothing else happens) and save a {@code pending} receipt. Fast: it makes no call
+     * to the sender. The pull itself is {@link #complete}.
+     */
+    public Accepted accept(UseCase useCase, String body) {
         JsonNode bundle = parseBundle(body);
         List<JsonNode> resources = new ArrayList<>();
         for (JsonNode e : bundle.get("entry")) {
@@ -93,9 +138,55 @@ public class ReceiveService {
 
         // Store exactly what was received. A HAPI refusal throws (502) and nothing else happens, except
         // for one named case: see storeReportingSubscriptions.
-        int stored = storeReportingSubscriptions(body, bundle, findings);
+        Stored stored = storeReportingSubscriptions(body, bundle, findings);
 
-        String receiptId = UUID.randomUUID().toString();
+        String manifestIds = manifests.isEmpty() ? null : String.join(", ", manifests.stream().map(m -> m.path("id").asText()).toList());
+        Receipt pending = new Receipt(UUID.randomUUID().toString(), clock.instant(), referralId, manifestIds, true, stored.entries(), null,
+                null, null, null, List.of(), List.of(), List.copyOf(findings), useCase.id(), Receipt.PENDING);
+        store.saveReceipt(pending);
+        return new Accepted(pending, transactionResponse(stored.response(), stored.entries()), useCase, manifests, contentEntries, findings,
+                several);
+    }
+
+    /**
+     * Runs the pull for an accepted payload and saves the finished receipt. A failed or stopped pull is a result recorded in
+     * the receipt; only a crash of the pull itself is turned into {@code failed}, with a finding that says so.
+     */
+    public Receipt complete(Accepted a) {
+        Receipt done;
+        try {
+            done = pull(a);
+        } catch (RuntimeException e) {
+            List<ArexClient.Finding> findings = new ArrayList<>(a.findings);
+            findings.add(new ArexClient.Finding("PULL_FAILED", "local",
+                    "The callback to the sender crashed before it finished (" + e.getClass().getSimpleName() + "). The referral itself is stored."));
+            Receipt p = a.pending;
+            done = new Receipt(p.id(), p.receivedAt(), p.referralId(), p.manifestId(), p.accepted(), p.hapiEntries(), p.sender(), p.tokenEndpoint(),
+                    p.authorizationDetailsType(), "the callback crashed", List.of(), List.of(), findings, p.useCase(), Receipt.FAILED);
+        }
+        store.saveReceipt(done);
+        return done;
+    }
+
+    /** At start-up, a receipt still {@code pending} was cut off by a restart: say so instead of leaving it pending for ever. */
+    @PostConstruct
+    void markInterrupted() {
+        for (Receipt r : store.recent(1000)) {
+            if (Receipt.PENDING.equals(r.state())) {
+                List<ArexClient.Finding> findings = new ArrayList<>(r.findings());
+                findings.add(new ArexClient.Finding("PULL_INTERRUPTED", "local",
+                        "The server restarted while this callback was still running. The referral is stored; no images were saved."));
+                store.saveReceipt(new Receipt(r.id(), r.receivedAt(), r.referralId(), r.manifestId(), r.accepted(), r.hapiEntries(), r.sender(),
+                        r.tokenEndpoint(), r.authorizationDetailsType(), "the server restarted", r.steps(), r.objects(), findings, r.useCase(),
+                        Receipt.INTERRUPTED));
+            }
+        }
+    }
+
+    private Receipt pull(Accepted a) {
+        Receipt p = a.pending;
+        String receiptId = p.id();
+        List<ArexClient.Finding> findings = a.findings;
         List<Receipt.ReceiptObject> objects = new ArrayList<>();
         List<ArexClient.Step> steps = new ArrayList<>();
         List<String> stops = new ArrayList<>();
@@ -103,10 +194,10 @@ public class ReceiveService {
         String tokenEndpoint = null;
         String adType = null;
         Set<String> usedKeys = new HashSet<>();
-        if (!manifests.isEmpty() && !contentEntries.isEmpty()) {
-            for (Map.Entry<JsonNode, List<JsonNode>> group : entriesByManifest(manifests, contentEntries, findings, objects, usedKeys).entrySet()) {
+        if (!a.manifests.isEmpty() && !a.contentEntries.isEmpty()) {
+            for (Map.Entry<JsonNode, List<JsonNode>> group : entriesByManifest(a.manifests, a.contentEntries, findings, objects, usedKeys).entrySet()) {
                 String id = group.getKey().path("id").asText();
-                String tag = several ? "[" + id + "] " : "";
+                String tag = a.several ? "[" + id + "] " : "";
                 ArexClient.Outcome o = pullAndRecord(receiptId, group.getKey(), group.getValue(), objects, findings, usedKeys);
                 arexBase = arexBase == null ? o.arexBase() : arexBase;
                 tokenEndpoint = tokenEndpoint == null ? o.tokenEndpoint() : tokenEndpoint;
@@ -119,12 +210,36 @@ public class ReceiveService {
                 }
             }
         }
+        return new Receipt(receiptId, p.receivedAt(), p.referralId(), p.manifestId(), true, p.hapiEntries(), arexBase, tokenEndpoint, adType,
+                stops.isEmpty() ? null : String.join(" | ", stops), steps, objects, findings, a.useCase.id(), Receipt.COMPLETE);
+    }
 
-        String manifestIds = manifests.isEmpty() ? null : String.join(", ", manifests.stream().map(m -> m.path("id").asText()).toList());
-        Receipt receipt = new Receipt(receiptId, clock.instant(), referralId, manifestIds, true, stored, arexBase, tokenEndpoint, adType,
-                stops.isEmpty() ? null : String.join(" | ", stops), steps, objects, findings, useCase.id());
-        store.saveReceipt(receipt);
-        return receipt;
+    /**
+     * What the sender is told. FHIR says a successful transaction answers with a Bundle of type {@code transaction-response}, one
+     * entry per request entry. HAPI's own is used as it is. If HAPI's body is not one (an empty or odd reply), one is built with a
+     * "200 OK" entry for each entry stored, so the sender always receives a valid answer.
+     */
+    private String transactionResponse(String hapiBody, int stored) {
+        try {
+            JsonNode n = hapiBody == null || hapiBody.isBlank() ? null : mapper.readTree(hapiBody);
+            if (n != null && n.isObject() && "Bundle".equals(n.path("resourceType").asText())
+                    && "transaction-response".equals(n.path("type").asText())) {
+                return hapiBody;
+            }
+        } catch (IOException e) {
+            // fall through to the built answer
+        }
+        com.fasterxml.jackson.databind.node.ObjectNode out = mapper.createObjectNode();
+        out.put("resourceType", "Bundle");
+        out.put("type", "transaction-response");
+        com.fasterxml.jackson.databind.node.ArrayNode entries = out.putArray("entry");
+        for (int i = 0; i < stored; i++) {
+            entries.addObject().putObject("response").put("status", "200 OK");
+        }
+        return out.toString();
+    }
+
+    private record Stored(int entries, String response) {
     }
 
     /**
@@ -173,12 +288,12 @@ public class ReceiveService {
      * HAPI refuses a payload that holds Subscriptions, store it again WITHOUT those resources, say so
      * as a finding, and go on. If HAPI still refuses, that refusal is final (502).
      *
-     * @return the number of entries stored
+     * @return how many entries were stored, and HAPI's answer to the transaction that stored them
      */
-    private int storeReportingSubscriptions(String body, JsonNode bundle, List<ArexClient.Finding> findings) {
+    private Stored storeReportingSubscriptions(String body, JsonNode bundle, List<ArexClient.Finding> findings) {
         try {
-            hapi.postTransaction(body);
-            return bundle.get("entry").size();
+            String response = hapi.postTransaction(body);
+            return new Stored(bundle.get("entry").size(), response);
         } catch (UpstreamException refused) {
             int status = refused.upstreamStatus();
             if (status < 400 || status >= 500) {
@@ -198,11 +313,11 @@ public class ReceiveService {
             }
             com.fasterxml.jackson.databind.node.ObjectNode reduced = ((com.fasterxml.jackson.databind.node.ObjectNode) bundle).deepCopy();
             reduced.set("entry", kept);
-            hapi.postTransaction(reduced.toString());
+            String response = hapi.postTransaction(reduced.toString());
             findings.add(new ArexClient.Finding("SUBSCRIPTION_NOT_STORED", "F29, O9",
                     "HAPI refused the payload as sent (" + refused.getMessage().replaceAll("\\s+", " ")
                             + "). It was stored again without its " + dropped + " Subscription resource(s); everything else is stored as received."));
-            return kept.size();
+            return new Stored(kept.size(), response);
         }
     }
 

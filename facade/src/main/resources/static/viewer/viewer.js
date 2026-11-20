@@ -96,7 +96,7 @@
       row.appendChild(el('td', useCaseLabel(r.useCase)));
       row.appendChild(el('td', r.referralId || '(none)', 'mono'));
       row.appendChild(el('td', r.manifestId || '(none)', 'mono'));
-      row.appendChild(el('td', saved + ' of ' + r.objects.length + ' saved'));
+      row.appendChild(el('td', r.state === 'pending' ? 'pulling images... (Refresh)' : saved + ' of ' + r.objects.length + ' saved'));
       row.appendChild(el('td', r.findings.length));
       var cell = el('td');
       var open = el('button', 'Open', 'link');
@@ -157,6 +157,9 @@
     fact(dl, 'Sender (ARex base)', r.sender);
     fact(dl, 'Token endpoint', r.tokenEndpoint);
     fact(dl, 'authorization_details type', r.authorizationDetailsType);
+    fact(dl, 'Callback to the sender', r.state === 'pending' ? 'still running: refresh in a moment'
+      : r.state === 'failed' ? 'crashed before it finished (see the findings)'
+      : r.state === 'interrupted' ? 'cut off by a server restart (see the findings)' : 'finished');
     fact(dl, 'Pull stopped because', r.stoppedBecause);
     host.appendChild(dl);
 

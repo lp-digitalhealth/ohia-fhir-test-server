@@ -54,7 +54,11 @@ services:
   # on it, so if it fails the /fhir API keeps working. Build it first on a new rollout
   # (docker compose build facade) so a build failure cannot interrupt the running stack.
   facade:
-    build: ../facade
+    build:
+      context: ../facade
+      args:
+        MAVEN_IMAGE: ${MAVEN_IMAGE:-maven:3.9-eclipse-temurin-21}
+        JRE_IMAGE: ${JRE_IMAGE:-eclipse-temurin:21-jre}
     image: ohia-facade:local
     restart: unless-stopped
     depends_on:

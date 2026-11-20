@@ -99,6 +99,10 @@ curl -X POST "https://<your-hostname>/ode/receive/uc04a" \
   --data-binary @interaction-01-bundle.json
 ```
 
+**What the client gets back, at once:** HTTP `200` and a standard FHIR `transaction-response` Bundle (a failure is an `OperationOutcome` instead; see the table below). The image callback has not happened yet when this arrives. The response headers say where the result will be: `Link: <.../ode/receipts/{id}>; rel="receipt"` and `X-Receipt-Id`.
+
+For your own scripts, adding `?wait=true` to the URL makes the server wait for the callback and answer with the finished receipt (plain JSON, not FHIR). A real client should not use it.
+
 Then you open `https://<your-hostname>/viewer/`, type the token, and look at the **Received** tab. Or:
 
 ```bash
@@ -109,8 +113,11 @@ curl -s -H "Authorization: Bearer $API_TOKEN" https://<your-hostname>/ode/receip
 
 A receipt is the result of one send. It is a result even when the callback failed, so read it, don't just look for an error code.
 
+**Check `state` first.** `pending` means the callback is still running and the images are not there yet: refresh in a minute. `complete` means it finished (successfully or not: read the rest). `failed` means the callback itself crashed and `interrupted` means the server restarted during it; in both cases the referral is stored but no images were saved, and the findings say so.
+
 The callback worked when the receipt shows:
 
+- `state: "complete"`.
 - `accepted: true`: we stored the payload.
 - `stoppedBecause` is empty: the pull did not stop early.
 - Every object has `status: "saved"`. We only save an image after its size and SHA-256 match what the client declared.
@@ -124,9 +131,10 @@ Some findings are normal while ARex is a draft. `SIGNATURE_PLACEHOLDER` and `SIG
 | What you see | Likely cause | What to do |
 |---|---|---|
 | `401` on the send | Wrong or missing token, or `bearer` in lowercase | Check the header is exactly `Authorization: Bearer <token>` |
-| `413` | Payload over 10 MB | Send smaller images |
-| `422` | Not a transaction Bundle | The client's file is the wrong shape |
-| `502` with `HAPI-0507` | A reference in the Bundle points at another server | Their references must be relative (`Patient/x`) or under `https://<your-hostname>/fhir/`. See `UC04A_SENDING_GUIDE.md` section 1 |
+| `413` | Payload over 10 MB | Send smaller images. The body is an `OperationOutcome` |
+| `422` | Not a transaction Bundle | The client's file is the wrong shape. The body is an `OperationOutcome` whose `diagnostics` says why |
+| `502` with `HAPI-0507` (in the `OperationOutcome` diagnostics) | A reference in the Bundle points at another server | Their references must be relative (`Patient/x`) or under `https://<your-hostname>/fhir/`. See `UC04A_SENDING_GUIDE.md` section 1 |
+| Receipt `state` stays `pending` for several minutes | The sender's ARex server is slow or not answering; each call can wait up to a minute | Wait, then read the findings. The client already has its answer: the referral is stored |
 | Receipt finding `HOST_NOT_FOUND` | Their ARex host name doesn't resolve | They need a real public name. Nothing was contacted |
 | `UNSAFE_URL_REFUSED` | A URL was not https, not public, or on a different origin than their ARex base | They fix the URLs |
 | `TOKEN_REFUSED` | Their server rejected our token request | Almost always step A3 is not done, or they registered the wrong key. Ask them to check our client id and key address |
@@ -193,7 +201,7 @@ The image link in a manifest only works for the organization named as its reques
 ## 7. Keeping access under control
 
 - **One shared token** protects the whole server for now. Anyone who has it can read and change everything. Keep the list of who has it.
-- **To rotate it** (do this if it was shared too widely, or when a client leaves): on the VM, edit `API_TOKEN` in `deploy/.env`, run `docker compose up -d`, and give the new token to everyone still testing. The old token stops working at once. See `deploy/README.md` section 7.
+- **To rotate it** (do this if it was shared too widely, or when a client leaves): on the VM, edit `API_TOKEN` in `deploy/.env`, run `docker compose up -d`, and give the new token to everyone still testing. The old token stops working at once. See `deploy/README.md` section 10.
 - **To remove a direction-B client**: delete their entry from `facade/config/clients.json`. They can no longer get an ARex token or be sent to.
 - **To remove a direction-A client**: there is nothing to unregister on our side. Rotate the token if they should lose access, and ask them to remove our client id from their server.
 - **Replacing the shared token** with per-client login (SMART backend services) is planned for January 2027. When that arrives, this guide's token steps change.

@@ -54,6 +54,7 @@ public final class ArexSenderStub {
     public final AtomicBoolean unauthorizedOnce = new AtomicBoolean();
     public final AtomicInteger dropTokenRequests = new AtomicInteger(); // how many token requests to cut off with no response
     public volatile String tokenEndpointOverride;             // lets a test advertise a token endpoint on another origin
+    public volatile long delayMillis;                          // how long every answer is held back, for a slow sender
 
     private final HttpServer server;
     private final JWKSet clientKeys;
@@ -97,6 +98,13 @@ public final class ArexSenderStub {
         String method = ex.getRequestMethod();
         String path = ex.getRequestURI().getPath();
         requests.add(method + " " + path);
+        if (delayMillis > 0) {
+            try {
+                Thread.sleep(delayMillis);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
         try {
             if (method.equals("GET") && path.equals("/arex/.well-known/smart-configuration") && discoveryMode.equals("arex")) {
                 discovery(ex);

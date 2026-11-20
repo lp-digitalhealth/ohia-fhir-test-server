@@ -1,14 +1,14 @@
 {
   "resourceType": "StructureDefinition",
-  "id": "ohia-pas-claim-cdt",
-  "url": "https://oralhealthalliance.net/fhir/StructureDefinition/ohia-pas-claim-cdt",
+  "id": "ohia-pas-oral-pa-claim",
+  "url": "https://oralhealthalliance.net/fhir/StructureDefinition/ohia-pas-oral-pa-claim",
   "version": "0.1.0",
-  "name": "OHIAPASClaimCDT",
-  "title": "OHIA PAS Claim (CDT accepted)",
+  "name": "OHIAPASOralPAClaim",
+  "title": "OHIA PAS Oral Prior Authorization Claim",
   "status": "draft",
   "date": "2026-11-05",
   "publisher": "Oral Health Interoperability Alliance (OHIA)",
-  "description": "INTERIM OVERLAY, not part of Da Vinci PAS. An exact copy of the PAS 2.2.1 Claim profile (profile-claim, with profile-claim-base merged in) in which the ONLY change is that Claim.item.productOrService may also take a CDT code (http://www.ada.org/cdt). Binding strength stays required. Not PAS-conformant by definition. Remove it if PAS adds CDT to its own value set.",
+  "description": "INTERIM, not part of Da Vinci PAS. An exact copy of the PAS 2.2.1 Claim profile (profile-claim, with profile-claim-base merged in) in which the ONLY change is that Claim.item.productOrService may also take a CDT code (http://www.ada.org/cdt), so an oral (dental) prior-authorization REQUEST can carry its CDT procedure code. It is a request (Claim.use is pinned to preauthorization), not a claim for payment (X12 837D). It does not itself restrict Claim.type to oral: PAS's own type rule is inherited unchanged. Binding strength stays required. Not PAS-conformant by definition. Remove it if PAS adds CDT to its own value set.",
   "jurisdiction": [
     {
       "coding": [
@@ -9896,7 +9896,7 @@
         "binding": {
           "strength": "required",
           "valueSet": "http://ohia-codes.org/ValueSet/ohia-requested-service-type-cdt",
-          "description": "PAS X12 278 requested service types plus CDT (OHIA overlay)"
+          "description": "PAS X12 278 requested service types plus CDT (OHIA oral PA profile)"
         }
       },
       {

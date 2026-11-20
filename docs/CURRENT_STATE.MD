@@ -12,11 +12,11 @@ This document is for coding assistants to put the current state of the repo
 - A custom domain is **on hold** (owner, 2026-11-04). Nothing depends on it.
 
 ## Authentication (decision S1, open item S2)
-- **In the repo:** interim shared bearer token enforced by `deploy/Caddyfile`; `API_TOKEN` is passed by `deploy/docker-compose.yml`, documented in `deploy/.env.example` and `deploy/README.md` section 7.
+- **In the repo:** interim shared bearer token enforced by `deploy/Caddyfile`; `API_TOKEN` is passed by `deploy/docker-compose.yml`, documented in `deploy/.env.example` and `deploy/README.md` section 10.
 - **VERIFIED on the live server (real HAPI, rolled out 2026-11-04):** `GET /fhir/metadata` without a token returned 200; `GET /fhir/Patient` without a token returned 401; the same read with the token returned 200; `POST /fhir/Patient` without a token returned 401. From outside the VM, the no-token requests gave 200 (metadata), 401 (`/fhir/Patient`), 401 (the HAPI home page `/`) and 401 (the POST). HAPI and PostgreSQL did not restart; only Caddy was recreated.
 - **VERIFIED earlier on a stand-in upstream (not real HAPI):** a wrong, shortened or extended token gives 401; lowercase `bearer` gives 401 (the match is case-sensitive); `OPTIONS` is open; writes to `/fhir/metadata` need the token; path tricks such as `metadata/../Patient` are rejected; Compose refuses to start without `API_TOKEN`.
 - **UNVERIFIED:** browser CORS behavior against real HAPI, the case-sensitivity and wrong-token cases on the live server, and load.
-- **Operations:** the token lives only in the VM's `deploy/.env` (never in git) and with the owner. To roll out or rotate it, edit `API_TOKEN` in `.env` and run `docker compose up -d` (see `deploy/README.md` section 7).
+- **Operations:** the token lives only in the VM's `deploy/.env` (never in git) and with the owner. To roll out or rotate it, edit `API_TOKEN` in `.env` and run `docker compose up -d` (see `deploy/README.md` section 10).
 - **Revisit in January 2027:** replace the shared token with the real design (SMART backend services and standalone launch, F9 and M1). O1 is resolved (S3), so the facade exists and could take this over.
 
 ## Send UC04a, receive UC07, three-tab page (S8 to S10; `facade/`)
@@ -40,7 +40,7 @@ This document is for coding assistants to put the current state of the repo
 - **UNVERIFIED:** the live VM and Caddy for `/viewer/` and `/arex/jwks.json`; any real tester's ARex server; the discovery path and `authorization_details` type are assumptions; ARex wording (arex-8, 22, 39, 43, 48, 59) was read through a summarizer.
 
 ## Facade: UC07 sender and ARex content server (S3, S4, S5; `facade/`)
-- **In the repo (branch `November_Testing_Server_Setup`):** a Java 21 / Spring Boot service beside HAPI. Caddy routes only `/ode/*` and `/arex/*` to it; `/fhir` is unchanged. See `facade/README.md` and `deploy/README.md` section 8.
+- **In the repo (branch `November_Testing_Server_Setup`):** a Java 21 / Spring Boot service beside HAPI. Caddy routes only `/ode/*` and `/arex/*` to it; `/fhir` is unchanged. See `facade/README.md` and `deploy/README.md` sections 5 and 8.
 - **VERIFIED in the sandbox:** 94 automated tests pass (token lock, seed, read-back, per-send copy, send, SSRF refusals, registry, ARex tokens and content). Three security rules were mutation-checked (a deliberate break of manifest expiry, replay protection and manifest scoping each makes a test fail).
 - **VERIFIED end to end in the sandbox (21 checks):** against real HAPI 8.12.0 and the data repository at the pinned commit (`445d4ce`), a stand-in tester using a different JWT library (PyJWT) received the referral, got an ARex token, read the manifest, fetched both images with matching SHA-256 digests and ranges, and lost access on retraction.
 - **VERIFIED:** Caddy routing for `/fhir`, `/ode` and `/arex` against the Phase 1 facade and a stand-in HAPI. `/fhir` behavior was identical to the live server's.
@@ -48,7 +48,7 @@ This document is for coding assistants to put the current state of the repo
 - **UNVERIFIED / NOT DONE:** whether the facade answers through the live Caddy and certificate (`/ode/health`, `/arex/...`), any real tester's receiver, and ODE conformance (the profiles are unbuilt). The `Dockerfile` also builds on the sandbox host only through a workaround (see the build guide, section 4).
 - **Sender wire format is an inference** from the ODE IG's initiator CapabilityStatement (draft 0.1.0, no UC07 page). **ARex** is the v0.2.0 draft; the `authorization_details` type `arex-manifest`, 300-second tokens and the static client registry are this server's choices.
 - **Not built:** UC07 interactions 2 and 4, an automatic way to register testers, and token issuing for `/fhir`.
-- **Rollout (manual, owner):** `git pull`, `docker compose build facade`, `docker compose up -d`, then register a tester in `facade/config/clients.json` and seed (see `deploy/README.md` section 8).
+- **Rollout (manual, owner):** `git pull`, `docker compose build facade`, `docker compose up -d`, then register a tester in `facade/config/clients.json` and seed (see `deploy/README.md` sections 5, 7 and 8).
 
 ## Oral EOB read and search (`facade/`, branch `feature/oral-eob-endpoint`, not merged or deployed)
 - **In the repo:** `GET /fhir/ExplanationOfBenefit[/{id}]` serves the five oral claims-sharing EOBs (UC02a, UC02b, UC03, UC04a x2), loaded by `POST /ode/admin/seed-eob` from data-repo commit `6b84bb2`. Read-only. New Caddy route `@eob` sends it to the facade; `OdeTokenFilter` also guards it. The capability statement lists it as read and search-type with the data's profile address. Details: `facade/README.md`.
@@ -59,6 +59,13 @@ This document is for coding assistants to put the current state of the repo
 
 ## Patient-app base (UC07 interaction 6; `facade/`)
 `/patient-access/fhir` serves CARIN Blue Button 2.2.0 `Patient`, `Coverage`, `Organization`, `Practitioner` and `ExplanationOfBenefit` for patient-facing apps (read and search only). Load it with `POST /ode/admin/seed-patient-access`; it takes the interaction-06 files from `ohia-test-data` at a pinned commit. Found by the payer online member ID. Shared token for now. Detail: `facade/README.md`, section "Patient-app base". **Verified:** the full facade suite (233 tests), the real jar against the real data at the pinned commit on this machine (seed, lookups, refusals, data kept across a restart). **Not verified:** the HL7 validator on the data, the Caddy routes, a deployed VM. A write attempt answers 405 in Spring's default JSON, not a FHIR OperationOutcome.
+
+## Receive answers with a FHIR transaction-response (`facade/`, in branch `November_Testing`; not merged to `main` and not deployed)
+- **Why:** a client that posts a referral should get a standard FHIR answer (R4 http, "Batch/Transaction Response": a `transaction-response` Bundle, or an `OperationOutcome` on failure). It used to get a custom receipt, only after the whole ARex callback, so a slow sender timed out and saw nothing.
+- **In the repo:** `POST /ode/receive/{uc04a|uc07}` stores the Bundle, answers 200 with HAPI's `transaction-response` and headers `Link` (rel="receipt") and `X-Receipt-Id`, and runs the callback afterwards on a small thread pool. Failures are `OperationOutcome`s (422, 413, 502). `Receipt.state` is `pending`, `complete`, `failed` or `interrupted` (a receipt left pending by a restart is marked `interrupted` at start-up). `?wait=true` keeps the old wait-and-return-the-receipt answer, and the e2e scripts use it. The viewer shows a pending receipt.
+- **VERIFIED in the sandbox:** the full facade suite passes: 204 tests on the branch it was written on, 274 on `November_Testing` with the oral EOB and patient-app endpoints merged in (0 failures). Seven new rules were each broken on purpose and a test failed (answer waits for the pull, odd HAPI body passed on, restart sweep, Link header, error not an OperationOutcome, crash not caught, `wait=true`); one control first survived because its test used a non-JSON body, and was fixed.
+- **NOT VERIFIED:** the real jar against real HAPI, the viewer page in a browser, the live VM, and any real client. If HAPI refuses only the Subscription, the answer is HAPI's answer for the entries stored (29 of 30) and `SUBSCRIPTION_NOT_STORED` is in the receipt: that deviates from the transaction rule of one answer entry per request entry.
+- **Open:** the ODE IG still says only that the recipient "accepts referral transaction Bundles"; it should state this response.
 
 ## For testers
 `docs/CONSUMER_GUIDE.md` explains how to connect. `docs/AREX_RETRIEVAL_GUIDE.md` (with the tested script `docs/examples/arex_fetch.py`) explains how to retrieve the referral's images. `docs/FACADE_BUILD_GUIDE.md` explains how the facade was built, step by step, for anyone who wants to reproduce or adapt it. `docs/ONBOARDING_GUIDE.md` is for the organizer: how to bring a new client onto the server, in both directions (they send to us and we call back with ARex, or we send to them), using the harness to check each step. Written from the code and not yet run with a real client.

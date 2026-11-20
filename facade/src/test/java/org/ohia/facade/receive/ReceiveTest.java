@@ -92,7 +92,7 @@ class ReceiveTest {
     }
 
     private ResultActions receive(String body) throws Exception {
-        return mvc.perform(post("/ode/receive/uc04a").header("Authorization", "Bearer " + S1).contentType("application/fhir+json").content(body));
+        return mvc.perform(post("/ode/receive/uc04a?wait=true").header("Authorization", "Bearer " + S1).contentType("application/fhir+json").content(body));
     }
 
     private JsonNode receiveOk(String body) throws Exception {
