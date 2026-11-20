@@ -45,6 +45,14 @@
 	@pa path /patient-access/fhir /patient-access/fhir/*
 	@viewer path /viewer /viewer/*
 
+	# Oral claims-sharing EOBs (read and search) are served by the facade, not HAPI. Every method except OPTIONS goes
+	# there, so a write is refused (405) instead of being stored in HAPI where a read would never find it. OPTIONS keeps
+	# going to HAPI so browser CORS preflights still work. The shared token is required here and again in the facade.
+	@eob {
+		path /fhir/ExplanationOfBenefit /fhir/ExplanationOfBenefit/*
+		not method OPTIONS
+	}
+
 	handle @pa_meta {
 		reverse_proxy facade:8080
 	}
@@ -76,6 +84,17 @@
 	# Organizer endpoints (seed, send, delivery log): shared token here, and checked again
 	# inside the facade.
 	handle @ode {
+		handle @authed {
+			reverse_proxy facade:8080
+		}
+		handle {
+			header WWW-Authenticate Bearer
+			respond "Unauthorized: send Authorization: Bearer <token>" 401
+		}
+	}
+
+	# Oral EOBs under /fhir, from the facade (token required). If the facade is down only these paths return 502.
+	handle @eob {
 		handle @authed {
 			reverse_proxy facade:8080
 		}

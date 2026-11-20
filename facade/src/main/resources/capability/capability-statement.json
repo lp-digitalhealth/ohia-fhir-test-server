@@ -23,7 +23,7 @@
   "rest": [
     {
       "mode": "server",
-      "documentation": "TEST SERVER. This statement declares the capability the server is going for in the OHIA November testing, and it will change as the payloads do. IMPLEMENTED TODAY: FHIR R4 (4.0.1) read, create, update and search on the types below, and a transaction at the base; one shared bearer token for everything except this statement; receiving a UC04a or UC07 referral and pulling its images with ARex at POST {{BASE}}/ode/receive/{uc04a|uc07}; sending a UC04a or UC07 referral to a registered tester; an ARex content server at {{BASE}}/arex (discovery {{BASE}}/arex/.well-known/smart-configuration, our client key {{BASE}}/arex/jwks.json). TARGET, NOT IMPLEMENTED YET: SMART Backend Services at the FHIR base (signed key assertions); ODE profile validation and validation feedback; ARex manifest signature verification; a transaction posted to the FHIR base itself starting the ARex image pull (today only the receive endpoint does that).",
+      "documentation": "TEST SERVER. This statement declares the capability the server is going for in the OHIA November testing, and it will change as the payloads do. IMPLEMENTED TODAY: FHIR R4 (4.0.1) read, create, update and search on the types below (ExplanationOfBenefit: read and search only, see its own note), and a transaction at the base; one shared bearer token for everything except this statement; receiving a UC04a or UC07 referral and pulling its images with ARex at POST {{BASE}}/ode/receive/{uc04a|uc07}; sending a UC04a or UC07 referral to a registered tester; an ARex content server at {{BASE}}/arex (discovery {{BASE}}/arex/.well-known/smart-configuration, our client key {{BASE}}/arex/jwks.json). TARGET, NOT IMPLEMENTED YET: SMART Backend Services at the FHIR base (signed key assertions); ODE profile validation and validation feedback; ARex manifest signature verification; a transaction posted to the FHIR base itself starting the ARex image pull (today only the receive endpoint does that).",
       "security": {
         "description": "Interim: send Authorization: Bearer <shared token> on every request except GET {{BASE}}/fhir/metadata. Target: SMART Backend Services (client_credentials with a signed private_key_jwt assertion, RS384 or ES384). No OAuth token address is declared for the FHIR base because none is implemented here; the ARex token endpoint at {{BASE}}/arex/auth/token does not accept FHIR calls."
       },
@@ -147,6 +147,39 @@
             },
             {
               "code": "search-type"
+            }
+          ]
+        },
+        {
+          "type": "ExplanationOfBenefit",
+          "supportedProfile": [
+            "https://oralhealthalliance.net/fhir/StructureDefinition/ode-dental-claim"
+          ],
+          "documentation": "Read-only. The oral claims-sharing EOBs (UC02a, UC02b, UC03 and UC04a interaction 5), loaded by an organizer from a pinned commit of the data repository. The profile address is the one the data declares; no published implementation guide defines it (the ODE IG removed its EOB profile), so nothing is validated against it. Writes are refused.",
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "search-type"
+            }
+          ],
+          "searchParam": [
+            {
+              "name": "_id",
+              "type": "token"
+            },
+            {
+              "name": "patient",
+              "type": "reference"
+            },
+            {
+              "name": "identifier",
+              "type": "token"
+            },
+            {
+              "name": "status",
+              "type": "token"
             }
           ]
         },

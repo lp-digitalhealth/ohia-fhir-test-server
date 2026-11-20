@@ -122,6 +122,19 @@ The content URLs in the manifest need a token; anonymous access is never allowed
 
 **Good to know:** ARex is a **draft** specification (v0.2.0). The `authorization_details` type value `arex-manifest` is this server's own choice; tell the organizer if your client needs something else. The "radiographs" are 8x8 placeholder PNGs, and the manifest signature in the data is a placeholder.
 
+## Oral claims-sharing EOBs (read and search)
+
+The server holds five oral `ExplanationOfBenefit` resources (UC02a, UC02b, UC03 and UC04a, interaction 5). They are read-only test data, available with the same shared token as the rest of `/fhir`. They declare the profile `https://oralhealthalliance.net/fhir/StructureDefinition/ode-dental-claim`; no published guide defines it, so nothing is validated against it.
+
+```bash
+BASE=https://<server>
+curl -s -H "Authorization: Bearer $TOKEN" "$BASE/fhir/ExplanationOfBenefit?patient=Patient/patient-sarah-okonkwo"
+curl -s -H "Authorization: Bearer $TOKEN" "$BASE/fhir/ExplanationOfBenefit/eob-timothy-dental-claims-sharing"
+curl -s -H "Authorization: Bearer $TOKEN" "$BASE/fhir/ExplanationOfBenefit?identifier=urn:ohia:claims-sharing-id%7CCS-2026-UC03-001"
+```
+
+Search parameters: `patient`, `identifier`, `status`, `_id`, `_count`. Anything else is a 400, not an empty result. You cannot create or change these (405). If a search returns a Bundle that says nothing is loaded, ask the organizer to run `POST /ode/admin/seed-eob`.
+
 ## Patient-facing apps: the payer's claims data (UC07 interaction 6)
 A second base, `https://<server>/patient-access/fhir`, serves the payer's CARIN Blue Button 2.2.0 view of the test member. Same bearer token as the rest of the server. Read it as the patient app would:
 
