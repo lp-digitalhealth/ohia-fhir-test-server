@@ -13,23 +13,43 @@ import org.ohia.facade.arexclient.ArexClient;
  * @param stoppedBecause why the pull stopped early, or null
  * @param manifestId   the manifest id; when a payload carries several, their ids joined with ", "
  * @param sender       the sender's ARex base derived from the content URLs, or null
+ * @param state        {@code pending} while the pull is still running, then {@code complete}; {@code failed} if the pull
+ *                     itself crashed and {@code interrupted} if the server restarted during it. Receipts written before
+ *                     this field existed are {@code complete}.
  */
 public record Receipt(String id, Instant receivedAt, String referralId, String manifestId, boolean accepted,
         int hapiEntries, String sender, String tokenEndpoint, String authorizationDetailsType, String stoppedBecause,
-        List<ArexClient.Step> steps, List<ReceiptObject> objects, List<ArexClient.Finding> findings, String useCase) {
+        List<ArexClient.Step> steps, List<ReceiptObject> objects, List<ArexClient.Finding> findings, String useCase,
+        String state) {
+
+    public static final String PENDING = "pending";
+    public static final String COMPLETE = "complete";
+    public static final String FAILED = "failed";
+    public static final String INTERRUPTED = "interrupted";
+
+    /** A receipt written before {@code state} existed: the pull had finished. */
+    public Receipt(String id, Instant receivedAt, String referralId, String manifestId, boolean accepted, int hapiEntries,
+            String sender, String tokenEndpoint, String authorizationDetailsType, String stoppedBecause,
+            List<ArexClient.Step> steps, List<ReceiptObject> objects, List<ArexClient.Finding> findings, String useCase) {
+        this(id, receivedAt, referralId, manifestId, accepted, hapiEntries, sender, tokenEndpoint, authorizationDetailsType,
+                stoppedBecause, steps, objects, findings, useCase, COMPLETE);
+    }
 
     /** A receipt with no use case named is UC04a (the only kind there was before UC07 could be received). */
     public Receipt(String id, Instant receivedAt, String referralId, String manifestId, boolean accepted, int hapiEntries,
             String sender, String tokenEndpoint, String authorizationDetailsType, String stoppedBecause,
             List<ArexClient.Step> steps, List<ReceiptObject> objects, List<ArexClient.Finding> findings) {
         this(id, receivedAt, referralId, manifestId, accepted, hapiEntries, sender, tokenEndpoint, authorizationDetailsType,
-                stoppedBecause, steps, objects, findings, null);
+                stoppedBecause, steps, objects, findings, null, COMPLETE);
     }
 
-    /** Receipts written before UC07 could be received are all UC04a. */
+    /** Receipts written before UC07 could be received are all UC04a; ones written before {@code state} existed are complete. */
     public Receipt {
         if (useCase == null || useCase.isBlank()) {
             useCase = "uc04a";
+        }
+        if (state == null || state.isBlank()) {
+            state = COMPLETE;
         }
     }
 

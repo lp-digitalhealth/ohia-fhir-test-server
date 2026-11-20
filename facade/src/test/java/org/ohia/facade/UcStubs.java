@@ -37,6 +37,8 @@ public final class UcStubs {
     public static volatile int postStatus = 200;
     /** When true the stand-in HAPI refuses (422) only a transaction that contains a Subscription, as real HAPI 8.12 does for the UC04a one. */
     public static volatile boolean refuseSubscriptions;
+    /** When set, the stand-in HAPI answers a successful transaction with this body instead of a transaction-response Bundle. */
+    public static volatile String hapiBodyOverride;
 
     private static final HttpServer dataHost;
     private static final HttpServer hapi;
@@ -73,6 +75,7 @@ public final class UcStubs {
         tamperUc04a = false;
         postStatus = 200;
         refuseSubscriptions = false;
+        hapiBodyOverride = null;
     }
 
     public static byte[] fixtureBytes(String name) {
@@ -141,7 +144,7 @@ public final class UcStubs {
                 JsonNode r = e.get("resource");
                 hapiStore.put(r.get("resourceType").asText() + "/" + r.get("id").asText(), r);
             }
-            respond(ex, 200, "{\"resourceType\":\"Bundle\",\"type\":\"transaction-response\"}".getBytes(StandardCharsets.UTF_8));
+            respond(ex, 200, (hapiBodyOverride != null ? hapiBodyOverride : "{\"resourceType\":\"Bundle\",\"type\":\"transaction-response\"}").getBytes(StandardCharsets.UTF_8));
             return;
         }
         if (ex.getRequestMethod().equals("GET") && path.startsWith("/fhir/")) {

@@ -78,7 +78,7 @@ H = {"Authorization": "Bearer " + S1}
 
 
 def receive(body=payload, headers=None):
-    st, hd, b = call("POST", FACADE + "/ode/receive/uc04a", {**(headers or H), "Content-Type": "application/fhir+json"}, body)
+    st, hd, b = call("POST", FACADE + "/ode/receive/uc04a?wait=true", {**(headers or H), "Content-Type": "application/fhir+json"}, body)
     return st, (json.loads(b) if b and st == 200 else b)
 
 
