@@ -64,8 +64,12 @@
 			reverse_proxy facade:8080
 		}
 		handle {
+			# A FHIR client expects an OperationOutcome, the same body the facade's own token filter sends. Caddy
+			# answers this first, so the body is written here. In a respond body Caddy reads a { } pair as a
+			# placeholder and drops it, so every brace is escaped with a backslash (the backticks keep it literal).
 			header WWW-Authenticate Bearer
-			respond "Unauthorized: send Authorization: Bearer <token>" 401
+			header Content-Type application/fhir+json
+			respond `\{"resourceType":"OperationOutcome","issue":[\{"severity":"error","code":"login","details":\{"text":"Unauthorized: send Authorization: Bearer <token>"\}\}]\}` 401
 		}
 	}
 
