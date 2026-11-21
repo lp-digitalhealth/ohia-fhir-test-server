@@ -104,7 +104,8 @@
 		}
 		handle {
 			header WWW-Authenticate Bearer
-			respond "Unauthorized: send Authorization: Bearer <token>" 401
+			header Content-Type application/fhir+json
+			respond `\{"resourceType":"OperationOutcome","issue":[\{"severity":"error","code":"login","details":\{"text":"Unauthorized: send Authorization: Bearer <token>"\}\}]\}` 401
 		}
 	}
 
@@ -128,7 +129,9 @@
 		reverse_proxy hapi:8080
 	}
 	handle {
+		# Same OperationOutcome as the patient-access and oral EOB paths (braces escaped, see handle @pa).
 		header WWW-Authenticate Bearer
-		respond "Unauthorized: send Authorization: Bearer <token>" 401
+		header Content-Type application/fhir+json
+		respond `\{"resourceType":"OperationOutcome","issue":[\{"severity":"error","code":"login","details":\{"text":"Unauthorized: send Authorization: Bearer <token>"\}\}]\}` 401
 	}
 }
