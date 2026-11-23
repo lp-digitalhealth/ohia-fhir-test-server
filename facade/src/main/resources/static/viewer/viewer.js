@@ -136,6 +136,9 @@
     api('/ode/receipts/' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (r) {
       renderDetail(r);
       say('');
+      // The receipt card sits below the whole list. With more than a few receipts it is off screen, so Open looked like it did nothing.
+      var card = $('detail-card');
+      if (card && card.scrollIntoView) { card.scrollIntoView({ block: 'start' }); }
     }).catch(function (e) { say(e.message, true); });
   }
 
